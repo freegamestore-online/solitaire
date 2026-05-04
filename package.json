@@ -1,0 +1,13 @@
+{
+  "name": "solitaire",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "engines": { "node": ">=22" },
+  "pnpm": { "onlyBuiltDependencies": ["esbuild"] },
+  "scripts": {
+    "dev": "pnpm --filter @solitaire/web dev",
+    "build": "pnpm --filter @solitaire/web build",
+    "preview": "pnpm --filter @solitaire/web preview",
+    "typecheck": "pnpm --filter @solitaire/web exec tsc -b"
+  }
+}
