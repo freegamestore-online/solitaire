@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useGameSounds } from "@freegamestore/games";
 import {
   type Card,
   type Suit,
@@ -250,6 +251,7 @@ function EmptySlot({
 /* ------------------------------------------------------------------ */
 
 export function Game({ drawCount, onScore, onGameOver }: Props) {
+  const sounds = useGameSounds();
   const [state, setState] = useState<GameState>(initGame);
   const [moves, setMoves] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -278,9 +280,10 @@ export function Game({ drawCount, onScore, onGameOver }: Props) {
     if (isWon(state) && !wonRef.current) {
       wonRef.current = true;
       if (timerRef.current) clearInterval(timerRef.current);
+      sounds.playClear();
       onGameOver();
     }
-  }, [state, onGameOver]);
+  }, [state, onGameOver, sounds]);
 
   // Auto-complete
   useEffect(() => {
@@ -419,6 +422,7 @@ export function Game({ drawCount, onScore, onGameOver }: Props) {
           for (const c of cards) {
             destCol.push({ ...c, faceUp: true });
           }
+          sounds.playMove();
         } else if (to.type === "foundation") {
           // Only single cards to foundation
           if (cards.length > 1) return prev;
@@ -437,6 +441,7 @@ export function Game({ drawCount, onScore, onGameOver }: Props) {
             next.foundations[from.pile]!.pop();
           }
           destPile.push({ ...movingCard, faceUp: true });
+          sounds.playScore();
         } else {
           return prev;
         }
