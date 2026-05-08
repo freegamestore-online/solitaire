@@ -54,7 +54,7 @@ export default function App() {
             { label: "Score", value: score, accent: true },
             { label: "Best", value: bestScore },
           ]}
-          actions={<><button className="min-h-[2.75rem] min-w-[2.75rem]" onClick={start}>New Game</button><GameAuth /></>}
+          actions={<GameAuth />}
           rules={
             <div>
               <h3 style={{ fontWeight: 700 }}>Klondike Solitaire</h3>
