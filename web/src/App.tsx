@@ -55,6 +55,15 @@ export default function App() {
             { label: "Best", value: bestScore },
           ]}
           actions={<><button onClick={start}>New Game</button><GameAuth /></>}
+          rules={
+            <div>
+              <h3 style={{ fontWeight: 700 }}>Klondike Solitaire</h3>
+              <h4 style={{ fontWeight: 600 }}>Rules</h4>
+              <ul><li>Build foundation piles from Ace to King by suit</li><li>Tableau builds down in alternating colors</li></ul>
+              <h4 style={{ fontWeight: 600 }}>Controls</h4>
+              <ul><li>Tap to select a card, tap to place it</li><li>Draw 1 or Draw 3 mode available</li></ul>
+            </div>
+          }
         />
       }
     >
