@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { GameShell, GameTopbar, GameAuth } from "@freegamestore/games";
 import { Game } from "./components/Game";
 import { useLeaderboard } from "./hooks/useLeaderboard";
-import type { GamePhase, Difficulty } from "./types";
+import type { GamePhase } from "./types";
 
 const BEST_SCORE_KEY = "freesolitaire-best";
 
@@ -12,10 +12,9 @@ function getBestScore(): number {
 }
 
 export default function App() {
-  const [phase, setPhase] = useState<GamePhase>("menu");
+  const [phase, setPhase] = useState<GamePhase>("playing");
   const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(getBestScore);
-  const [difficulty, setDifficulty] = useState<Difficulty>("draw1");
   const [gameKey, setGameKey] = useState(0);
   const scoreRef = useRef(0);
   const { submitScore } = useLeaderboard("solitaire");
@@ -43,8 +42,6 @@ export default function App() {
     setPhase("playing");
   }, []);
 
-  const drawCount = difficulty === "draw1" ? 1 : 3;
-
   return (
     <GameShell
       topbar={
@@ -68,54 +65,26 @@ export default function App() {
       }
     >
       <div className="relative w-full h-full">
-        {phase === "playing" ? (
-          <Game
-            key={gameKey}
-            drawCount={drawCount}
-            onScore={handleScore}
-            onGameOver={handleGameOver}
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full gap-4">
-            <h1
-              className="text-4xl font-bold"
-              style={{ fontFamily: "Fraunces, serif" }}
+        <Game
+          key={gameKey}
+          drawCount={1}
+          onScore={handleScore}
+          onGameOver={handleGameOver}
+        />
+        {phase === "won" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4" style={{ background: "rgba(0,0,0,0.55)" }}>
+            <p
+              className="text-xl font-bold"
+              style={{ color: "var(--success)", fontFamily: "Fraunces, serif" }}
             >
-              Solitaire
-            </h1>
-            {phase === "won" && (
-              <p
-                className="text-xl font-bold"
-                style={{ color: "var(--success)", fontFamily: "Fraunces, serif" }}
-              >
-                You Won! Score: {score}
-              </p>
-            )}
-            <p style={{ color: "var(--muted)" }}>
-              Classic Klondike Solitaire. Tap to select, tap to place.
+              You Won! Score: {score}
             </p>
-            <div className="flex gap-2">
-              {([["draw1", "Draw 1"], ["draw3", "Draw 3"]] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setDifficulty(key)}
-                  className="px-4 py-2 rounded-xl font-semibold text-sm min-h-[2.75rem]"
-                  style={{
-                    background: difficulty === key ? "var(--accent)" : "transparent",
-                    color: difficulty === key ? "#fff" : "var(--muted)",
-                    border: difficulty === key ? "none" : "1px solid var(--line)",
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
             <button
               onClick={start}
               className="px-6 py-3 rounded-xl font-semibold min-h-[2.75rem]"
               style={{ background: "var(--accent)", color: "#fff" }}
             >
-              {phase === "menu" ? "Start Game" : "Play Again"}
+              Play Again
             </button>
           </div>
         )}
