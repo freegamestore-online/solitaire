@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { GameShell, GameTopbar } from "@freeappstore/games";
+import { GameShell, GameTopbar } from "@freegamestore/games";
 import { Game } from "./components/Game";
 import { useLeaderboard } from "./hooks/useLeaderboard";
 import type { GamePhase, Difficulty } from "./types";
