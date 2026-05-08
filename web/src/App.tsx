@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { GameShell, GameTopbar } from "@freegamestore/games";
+import { GameShell, GameTopbar, GameAuth } from "@freegamestore/games";
 import { Game } from "./components/Game";
 import { useLeaderboard } from "./hooks/useLeaderboard";
 import type { GamePhase, Difficulty } from "./types";
@@ -54,7 +54,7 @@ export default function App() {
             { label: "Score", value: score, accent: true },
             { label: "Best", value: bestScore },
           ]}
-          actions={<button onClick={start}>New Game</button>}
+          actions={<><button onClick={start}>New Game</button><GameAuth /></>}
         />
       }
     >
