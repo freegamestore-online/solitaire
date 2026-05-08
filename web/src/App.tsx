@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef } from "react";
-import { Shell } from "./components/Shell";
+import { GameShell, GameTopbar } from "@freeappstore/games";
 import { Game } from "./components/Game";
-import { Leaderboard } from "./components/Leaderboard";
 import { useLeaderboard } from "./hooks/useLeaderboard";
 import type { GamePhase, Difficulty } from "./types";
 
@@ -19,7 +18,7 @@ export default function App() {
   const [difficulty, setDifficulty] = useState<Difficulty>("draw1");
   const [gameKey, setGameKey] = useState(0);
   const scoreRef = useRef(0);
-  const { topScores, recentScores, submitScore, loading } = useLeaderboard("solitaire");
+  const { submitScore } = useLeaderboard("solitaire");
 
   const handleScore = useCallback((s: number) => {
     scoreRef.current = s;
@@ -47,80 +46,19 @@ export default function App() {
   const drawCount = difficulty === "draw1" ? 1 : 3;
 
   return (
-    <Shell
-      sidebar={
-        <nav className="flex-1 px-4 flex flex-col gap-3 py-4 overflow-auto">
-          <div className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
-            Score
-          </div>
-          <div
-            className="text-3xl font-bold"
-            style={{ fontFamily: "Fraunces, serif" }}
-          >
-            {score}
-          </div>
-          <div className="text-sm" style={{ color: "var(--muted)" }}>
-            Best: {bestScore}
-          </div>
-
-          {/* Difficulty selector */}
-          <div className="flex flex-col gap-1">
-            <div className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
-              Difficulty
-            </div>
-            <div className="flex gap-1">
-              {([["draw1", "Draw 1"], ["draw3", "Draw 3"]] as const).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => setDifficulty(key)}
-                  className="px-3 py-1 text-xs font-semibold rounded-lg"
-                  style={{
-                    background: difficulty === key ? "var(--accent)" : "transparent",
-                    color: difficulty === key ? "#fff" : "var(--muted)",
-                    border: difficulty === key ? "none" : "1px solid var(--line)",
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <button
-            onClick={start}
-            className="mt-2 px-4 py-2 rounded-xl font-semibold text-sm"
-            style={{ background: "var(--accent)", color: "#fff" }}
-          >
-            New Game
-          </button>
-
-          <div
-            className="mt-2 border-t"
-            style={{ borderColor: "var(--line)" }}
-          >
-            <div className="text-xs font-semibold px-4 pt-3" style={{ color: "var(--muted)" }}>
-              Leaderboard
-            </div>
-            <Leaderboard topScores={topScores} recentScores={recentScores} loading={loading} />
-          </div>
-        </nav>
-      }
-      dock={
-        <>
-          <div className="text-sm font-semibold">
-            Score: {score}
-          </div>
-          <button
-            onClick={start}
-            className="px-3 py-1 rounded-lg text-xs font-semibold"
-            style={{ background: "var(--accent)", color: "#fff" }}
-          >
-            New
-          </button>
-        </>
+    <GameShell
+      topbar={
+        <GameTopbar
+          title="Solitaire"
+          stats={[
+            { label: "Score", value: score, accent: true },
+            { label: "Best", value: bestScore },
+          ]}
+          actions={<button onClick={start}>New Game</button>}
+        />
       }
     >
-      <div className="relative w-full h-full min-h-[400px]">
+      <div className="relative w-full h-full">
         {phase === "playing" ? (
           <Game
             key={gameKey}
@@ -147,7 +85,7 @@ export default function App() {
             <p style={{ color: "var(--muted)" }}>
               Classic Klondike Solitaire. Tap to select, tap to place.
             </p>
-            <div className="flex gap-2 md:hidden">
+            <div className="flex gap-2">
               {([["draw1", "Draw 1"], ["draw3", "Draw 3"]] as const).map(([key, label]) => (
                 <button
                   key={key}
@@ -173,6 +111,6 @@ export default function App() {
           </div>
         )}
       </div>
-    </Shell>
+    </GameShell>
   );
 }
