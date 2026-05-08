@@ -54,7 +54,7 @@ export default function App() {
             { label: "Score", value: score, accent: true },
             { label: "Best", value: bestScore },
           ]}
-          actions={<><button onClick={start}>New Game</button><GameAuth /></>}
+          actions={<><button className="min-h-[2.75rem] min-w-[2.75rem]" onClick={start}>New Game</button><GameAuth /></>}
           rules={
             <div>
               <h3 style={{ fontWeight: 700 }}>Klondike Solitaire</h3>
@@ -99,7 +99,7 @@ export default function App() {
                 <button
                   key={key}
                   onClick={() => setDifficulty(key)}
-                  className="px-4 py-2 rounded-xl font-semibold text-sm"
+                  className="px-4 py-2 rounded-xl font-semibold text-sm min-h-[2.75rem]"
                   style={{
                     background: difficulty === key ? "var(--accent)" : "transparent",
                     color: difficulty === key ? "#fff" : "var(--muted)",
@@ -112,7 +112,7 @@ export default function App() {
             </div>
             <button
               onClick={start}
-              className="px-6 py-3 rounded-xl font-semibold"
+              className="px-6 py-3 rounded-xl font-semibold min-h-[2.75rem]"
               style={{ background: "var(--accent)", color: "#fff" }}
             >
               {phase === "menu" ? "Start Game" : "Play Again"}

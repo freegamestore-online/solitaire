@@ -600,7 +600,7 @@ export function Game({ drawCount, onScore, onGameOver }: Props) {
         <button
           onClick={undo}
           disabled={history.length === 0}
-          className="px-3 py-1 rounded-lg text-sm font-semibold"
+          className="px-3 py-1 rounded-lg text-sm font-semibold min-h-[2.75rem]"
           style={{
             background: history.length > 0 ? "var(--accent)" : "var(--line)",
             color: history.length > 0 ? "#fff" : "var(--muted)",
