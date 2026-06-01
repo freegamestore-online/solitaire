@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { useGameSounds } from "@freegamestore/games";
 import {
   type Card,
@@ -35,6 +35,13 @@ interface Props {
   drawCount: number;
   onScore: (score: number) => void;
   onGameOver: () => void;
+  /** Reports moves / elapsed time / whether undo is available, for the topbar. */
+  onMeta?: (m: { moves: number; time: string; canUndo: boolean }) => void;
+}
+
+/** Imperative handle so the topbar's Undo button can drive the game. */
+export interface GameHandle {
+  undo: () => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -93,6 +100,75 @@ function allFaceUp(state: GameState): boolean {
 
 function isWon(state: GameState): boolean {
   return state.foundations.every((p) => p.length === 13);
+}
+
+/**
+ * Pure move resolver. Returns the resulting state (+ which sound to play) for a
+ * legal move, or null if the move isn't allowed. Kept side-effect free so the
+ * caller can know up-front whether a tap landed a move — that's what lets us
+ * re-target the selection to a freshly tapped card instead of just clearing it.
+ */
+function computeMove(
+  prev: GameState,
+  from: Location,
+  to: Location,
+): { next: GameState; sound: "move" | "score" } | null {
+  const next = cloneState(prev);
+  let cards: Card[] = [];
+
+  // Gather the card(s) being moved from the source.
+  if (from.type === "waste") {
+    if (next.waste.length === 0) return null;
+    cards = [next.waste[next.waste.length - 1]!];
+  } else if (from.type === "tableau") {
+    const col = next.tableau[from.col]!;
+    if (from.cardIndex < 0 || from.cardIndex >= col.length) return null;
+    cards = col.slice(from.cardIndex);
+  } else if (from.type === "foundation") {
+    const pile = next.foundations[from.pile]!;
+    if (pile.length === 0) return null;
+    cards = [pile[pile.length - 1]!];
+  }
+
+  if (cards.length === 0) return null;
+  const movingCard = cards[0]!;
+
+  // Remove the moving cards from their source pile (only reached once the
+  // destination has been validated below).
+  const detachFromSource = () => {
+    if (from.type === "waste") {
+      next.waste.pop();
+    } else if (from.type === "tableau") {
+      next.tableau[from.col] = next.tableau[from.col]!.slice(0, from.cardIndex);
+      const srcCol = next.tableau[from.col]!;
+      if (srcCol.length > 0 && !srcCol[srcCol.length - 1]!.faceUp) {
+        srcCol[srcCol.length - 1]!.faceUp = true;
+      }
+    } else if (from.type === "foundation") {
+      next.foundations[from.pile]!.pop();
+    }
+  };
+
+  if (to.type === "tableau") {
+    const destCol = next.tableau[to.col]!;
+    if (!canPlaceOnTableau(movingCard, destCol)) return null;
+    // Multi-card stacks can only come from the tableau.
+    if ((from.type === "waste" || from.type === "foundation") && cards.length > 1) return null;
+    detachFromSource();
+    for (const c of cards) destCol.push({ ...c, faceUp: true });
+    return { next, sound: "move" };
+  }
+
+  if (to.type === "foundation") {
+    if (cards.length > 1) return null;
+    const destPile = next.foundations[to.pile]!;
+    if (!canPlaceOnFoundation(movingCard, destPile)) return null;
+    detachFromSource();
+    destPile.push({ ...movingCard, faceUp: true });
+    return { next, sound: "score" };
+  }
+
+  return null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -160,12 +236,14 @@ function CardView({
         border: selected
           ? "3px solid var(--accent)"
           : "2px solid var(--line-strong)",
-        background: "var(--paper)",
+        background: selected ? "color-mix(in srgb, var(--accent) 14%, var(--paper))" : "var(--paper)",
         position: "absolute",
         cursor: onClick ? "pointer" : "default",
         userSelect: "none",
         WebkitUserSelect: "none",
-        boxShadow: selected ? "0 0 0 2px var(--accent)" : "0 1px 3px rgba(0,0,0,0.12)",
+        boxShadow: selected
+          ? "0 0 0 3px var(--accent), 0 6px 18px rgba(0,0,0,0.35)"
+          : "0 1px 3px rgba(0,0,0,0.12)",
         padding: 4,
         display: "flex",
         flexDirection: "column",
@@ -250,7 +328,10 @@ function EmptySlot({
 /*  Main Game Component                                                */
 /* ------------------------------------------------------------------ */
 
-export function Game({ drawCount, onScore, onGameOver }: Props) {
+export const Game = forwardRef<GameHandle, Props>(function Game(
+  { drawCount, onScore, onGameOver, onMeta },
+  ref,
+) {
   const sounds = useGameSounds();
   const [state, setState] = useState<GameState>(initGame);
   const [moves, setMoves] = useState(0);
@@ -350,6 +431,8 @@ export function Game({ drawCount, onScore, onGameOver }: Props) {
     });
   }, []);
 
+  useImperativeHandle(ref, () => ({ undo }), [undo]);
+
   /* ---- Stock click ---- */
   const drawFromStock = useCallback(() => {
     setSelected(null);
@@ -374,85 +457,33 @@ export function Game({ drawCount, onScore, onGameOver }: Props) {
   }, [drawCount, pushHistory]);
 
   /* ---- Selection / move logic (two-tap) ---- */
-  const tryMove = useCallback(
-    (from: Location, to: Location) => {
-      setState((prev) => {
-        const next = cloneState(prev);
-        let cards: Card[] = [];
 
-        // Get cards from source
-        if (from.type === "waste") {
-          if (next.waste.length === 0) return prev;
-          cards = [next.waste[next.waste.length - 1]!];
-        } else if (from.type === "tableau") {
-          const col = next.tableau[from.col]!;
-          if (from.cardIndex < 0 || from.cardIndex >= col.length) return prev;
-          cards = col.slice(from.cardIndex);
-        } else if (from.type === "foundation") {
-          const pile = next.foundations[from.pile]!;
-          if (pile.length === 0) return prev;
-          cards = [pile[pile.length - 1]!];
-        }
-
-        if (cards.length === 0) return prev;
-        const movingCard = cards[0]!;
-
-        // Try to place on destination
-        if (to.type === "tableau") {
-          const destCol = next.tableau[to.col]!;
-          if (!canPlaceOnTableau(movingCard, destCol)) return prev;
-          // Only single cards from waste/foundation
-          if (from.type === "waste" || from.type === "foundation") {
-            if (cards.length > 1) return prev;
-          }
-          // Remove from source
-          if (from.type === "waste") {
-            next.waste.pop();
-          } else if (from.type === "tableau") {
-            next.tableau[from.col] = next.tableau[from.col]!.slice(0, from.cardIndex);
-            // Flip new top card
-            const srcCol = next.tableau[from.col]!;
-            if (srcCol.length > 0 && !srcCol[srcCol.length - 1]!.faceUp) {
-              srcCol[srcCol.length - 1]!.faceUp = true;
-            }
-          } else if (from.type === "foundation") {
-            next.foundations[from.pile]!.pop();
-          }
-          // Add to destination
-          for (const c of cards) {
-            destCol.push({ ...c, faceUp: true });
-          }
-          sounds.playMove();
-        } else if (to.type === "foundation") {
-          // Only single cards to foundation
-          if (cards.length > 1) return prev;
-          const destPile = next.foundations[to.pile]!;
-          if (!canPlaceOnFoundation(movingCard, destPile)) return prev;
-          // Remove from source
-          if (from.type === "waste") {
-            next.waste.pop();
-          } else if (from.type === "tableau") {
-            next.tableau[from.col] = next.tableau[from.col]!.slice(0, from.cardIndex);
-            const srcCol = next.tableau[from.col]!;
-            if (srcCol.length > 0 && !srcCol[srcCol.length - 1]!.faceUp) {
-              srcCol[srcCol.length - 1]!.faceUp = true;
-            }
-          } else if (from.type === "foundation") {
-            next.foundations[from.pile]!.pop();
-          }
-          destPile.push({ ...movingCard, faceUp: true });
-          sounds.playScore();
-        } else {
-          return prev;
-        }
-
-        pushHistory(prev);
-        setMoves((m) => m + 1);
-        return next;
-      });
-      setSelected(null);
+  // Whether a location can be picked up as a move source.
+  const canSelect = useCallback(
+    (loc: Location): boolean => {
+      if (loc.type === "waste") return state.waste.length > 0;
+      if (loc.type === "foundation") return state.foundations[loc.pile]!.length > 0;
+      const col = state.tableau[loc.col]!;
+      const card = col[loc.cardIndex];
+      return !!card && card.faceUp;
     },
-    [pushHistory],
+    [state],
+  );
+
+  // Attempts a move; returns true if it was legal and applied. Side effects live
+  // out here (not inside the setState updater) so the result is known synchronously.
+  const tryMove = useCallback(
+    (from: Location, to: Location): boolean => {
+      const result = computeMove(state, from, to);
+      if (!result) return false;
+      pushHistory(state);
+      setState(result.next);
+      setMoves((m) => m + 1);
+      if (result.sound === "move") sounds.playMove();
+      else sounds.playScore();
+      return true;
+    },
+    [state, pushHistory, sounds],
   );
 
   /* ---- Auto-move to foundation on double-tap / single card ---- */
@@ -487,37 +518,46 @@ export function Game({ drawCount, onScore, onGameOver }: Props) {
     [state, tryMove],
   );
 
+  const sameLocation = (a: Location, b: Location): boolean => {
+    if (a.type !== b.type) return false;
+    if (a.type === "waste") return true;
+    if (a.type === "tableau" && b.type === "tableau") {
+      return a.col === b.col && a.cardIndex === b.cardIndex;
+    }
+    if (a.type === "foundation" && b.type === "foundation") {
+      return a.pile === b.pile;
+    }
+    return false;
+  };
+
   const handleCardClick = useCallback(
     (loc: Location) => {
       if (autoCompleting) return;
 
+      // First tap: pick the card up (only if it's a legal source).
       if (selected === null) {
-        // Try auto-foundation on tap of top card
-        if (
-          (loc.type === "waste") ||
-          (loc.type === "tableau" && loc.cardIndex === (state.tableau[loc.col]?.length ?? 0) - 1)
-        ) {
-          // On second thought: first tap = select. Double-tap could auto-move, but
-          // for reliability, just select on first tap.
-        }
-        setSelected(loc);
+        if (canSelect(loc)) setSelected(loc);
+        return;
+      }
+
+      // Tapping the same card again: send it to a foundation if possible,
+      // then drop the selection either way.
+      if (sameLocation(selected, loc)) {
+        tryAutoFoundation(loc);
+        setSelected(null);
+        return;
+      }
+
+      // Tapping a different card: try the move. If it lands, clear the
+      // selection; if it's illegal, re-target onto the newly tapped card so a
+      // single tap is enough to switch selection (instead of needing two).
+      if (tryMove(selected, loc)) {
+        setSelected(null);
       } else {
-        // Check if tapping same location — try auto-foundation
-        if (
-          selected.type === loc.type &&
-          (selected.type === "waste" ||
-            (selected.type === "tableau" && loc.type === "tableau" && selected.col === loc.col && selected.cardIndex === loc.cardIndex) ||
-            (selected.type === "foundation" && loc.type === "foundation" && selected.pile === loc.pile))
-        ) {
-          if (tryAutoFoundation(loc)) return;
-          setSelected(null);
-          return;
-        }
-        // Try to move
-        tryMove(selected, loc);
+        setSelected(canSelect(loc) ? loc : null);
       }
     },
-    [selected, state, tryMove, tryAutoFoundation, autoCompleting],
+    [selected, canSelect, tryMove, tryAutoFoundation, autoCompleting],
   );
 
   const handleEmptyTableauClick = useCallback(
@@ -525,6 +565,7 @@ export function Game({ drawCount, onScore, onGameOver }: Props) {
       if (autoCompleting) return;
       if (selected) {
         tryMove(selected, { type: "tableau", col, cardIndex: 0 });
+        setSelected(null);
       }
     },
     [selected, tryMove, autoCompleting],
@@ -533,17 +574,15 @@ export function Game({ drawCount, onScore, onGameOver }: Props) {
   const handleFoundationClick = useCallback(
     (pile: number) => {
       if (autoCompleting) return;
+      const loc: Location = { type: "foundation", pile };
       if (selected) {
-        tryMove(selected, { type: "foundation", pile });
-      } else {
-        // Select from foundation
-        const p = state.foundations[pile]!;
-        if (p.length > 0) {
-          setSelected({ type: "foundation", pile });
-        }
+        if (tryMove(selected, loc)) setSelected(null);
+        else setSelected(canSelect(loc) ? loc : null);
+      } else if (canSelect(loc)) {
+        setSelected(loc);
       }
     },
-    [selected, state.foundations, tryMove, autoCompleting],
+    [selected, canSelect, tryMove, autoCompleting],
   );
 
   /* ---- Rendering ---- */
@@ -552,6 +591,11 @@ export function Game({ drawCount, onScore, onGameOver }: Props) {
     const sec = s % 60;
     return `${min}:${sec.toString().padStart(2, "0")}`;
   };
+
+  // Surface moves / time / undo-availability to the topbar.
+  useEffect(() => {
+    onMeta?.({ moves, time: formatTime(elapsed), canUndo: history.length > 0 });
+  }, [moves, elapsed, history.length, onMeta]);
 
   const FOUNDATION_SUITS: Suit[] = ["hearts", "diamonds", "clubs", "spades"];
   const GAP = 8;
@@ -589,32 +633,6 @@ export function Game({ drawCount, onScore, onGameOver }: Props) {
         if (e.target === e.currentTarget) setSelected(null);
       }}
     >
-      {/* Stats bar */}
-      <div
-        className="flex items-center justify-between px-4 py-2 shrink-0"
-        style={{ borderBottom: "1px solid var(--line)" }}
-      >
-        <div className="flex items-center gap-4 text-sm">
-          <span>
-            Moves: <b>{moves}</b>
-          </span>
-          <span>
-            Time: <b>{formatTime(elapsed)}</b>
-          </span>
-        </div>
-        <button
-          onClick={undo}
-          disabled={history.length === 0}
-          className="px-3 py-1 rounded-lg text-sm font-semibold min-h-[2.75rem]"
-          style={{
-            background: history.length > 0 ? "var(--accent)" : "var(--line)",
-            color: history.length > 0 ? "#fff" : "var(--muted)",
-          }}
-        >
-          Undo
-        </button>
-      </div>
-
       {/* Board */}
       <div
         className="flex-1 overflow-auto"
@@ -743,7 +761,7 @@ export function Game({ drawCount, onScore, onGameOver }: Props) {
                     left: x,
                     top: y,
                     zIndex: idx + 10,
-                    transform: partOfSel ? "translateY(-4px)" : undefined,
+                    transform: partOfSel ? "translateY(-8px)" : undefined,
                     transition: "transform 0.1s",
                   }}
                   selected={partOfSel && (isSelected(loc) || (selected?.type === "tableau" && selected.col === colIdx && idx >= selected.cardIndex))}
@@ -762,4 +780,4 @@ export function Game({ drawCount, onScore, onGameOver }: Props) {
       </div>
     </div>
   );
-}
+});

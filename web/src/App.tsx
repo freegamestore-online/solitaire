@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 import { GameShell, GameTopbar, GameAuth } from "@freegamestore/games";
-import { Game } from "./components/Game";
+import { Game, type GameHandle } from "./components/Game";
 import { useLeaderboard } from '@freegamestore/games';
 import type { GamePhase } from "./types";
 
@@ -16,7 +16,9 @@ export default function App() {
   const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(getBestScore);
   const [gameKey, setGameKey] = useState(0);
+  const [meta, setMeta] = useState({ moves: 0, time: "0:00", canUndo: false });
   const scoreRef = useRef(0);
+  const gameRef = useRef<GameHandle>(null);
   const { submitScore } = useLeaderboard("solitaire");
 
   const handleScore = useCallback((s: number) => {
@@ -50,8 +52,26 @@ export default function App() {
           stats={[
             { label: "Score", value: score, accent: true },
             { label: "Best", value: bestScore },
+            { label: "Moves", value: meta.moves },
+            { label: "Time", value: meta.time },
           ]}
-          actions={<GameAuth />}
+          actions={
+            <>
+              <button
+                aria-label="Undo"
+                onClick={() => gameRef.current?.undo()}
+                disabled={!meta.canUndo}
+                className="rounded-lg px-3 py-2 min-h-[2.75rem] text-xs font-bold transition disabled:opacity-40"
+                style={{
+                  background: meta.canUndo ? "var(--accent)" : "var(--line)",
+                  color: meta.canUndo ? "#fff" : "var(--muted)",
+                }}
+              >
+                Undo
+              </button>
+              <GameAuth />
+            </>
+          }
           rules={
             <div>
               <h3 style={{ fontWeight: 700 }}>Klondike Solitaire</h3>
@@ -67,9 +87,11 @@ export default function App() {
       <div className="relative w-full h-full">
         <Game
           key={gameKey}
+          ref={gameRef}
           drawCount={1}
           onScore={handleScore}
           onGameOver={handleGameOver}
+          onMeta={setMeta}
         />
         {phase === "won" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4" style={{ background: "rgba(0,0,0,0.55)" }}>
