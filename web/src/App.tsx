@@ -9,12 +9,24 @@ import { MAX_DEAL, randomDealNumber } from "./lib/freecell";
 import { dealTriPeaks, triPeaksPuzzle } from "./lib/tripeaks";
 import { dealPyramid, pyramidPuzzle } from "./lib/pyramid";
 import { findSolvableDeal } from "./lib/solver";
+import { dailyDealNumber, dateKey } from "./lib/daily";
+import {
+  LEGACY_BEST_KEY,
+  STATS_KEY,
+  migrateStats,
+  modeOf,
+  recordStart,
+  recordWin,
+  type StatsFile,
+} from "./lib/stats";
 import { useLeaderboard } from '@freegamestore/games';
 import { Celebration, ParticleLayer, type ParticleLayerHandle } from "./feel";
 import type { GamePhase, Variant } from "./types";
 
-const BEST_SCORE_KEY = "freesolitaire-best";
 const WIN_COLOURS = ["#16a34a", "#2563eb", "#d97706"];
+
+/** Daily times go up the board as higher scores: 100000 minus the seconds taken. */
+const DAILY_SCORE_BASE = 100000;
 
 const MODES: { value: Variant; label: string }[] = [
   { value: "klondike", label: "Klondike" },
@@ -26,14 +38,8 @@ const MODES: { value: Variant; label: string }[] = [
   { value: "pyramid", label: "Pyramid" },
 ];
 
-/** Klondike keeps the original best-score key, so existing players keep their best. Spider gets its own per suit count. */
-function bestKey(variant: Variant): string {
-  if (variant === "klondike") return BEST_SCORE_KEY;
-  if (variant === "freecell") return "freesolitaire-freecell-best";
-  if (variant === "tripeaks") return "freesolitaire-tripeaks-best";
-  if (variant === "pyramid") return "freesolitaire-pyramid-best";
-  return `freesolitaire-spider-${variant}-best`;
-}
+/** The key a mode goes by in stats, and in the daily deal and leaderboard names. */
+const modeKey = (variant: Variant): string => String(variant);
 
 /** The first deal at or after `from` that the solver can win. Falls back to `from` if none of the next few is solvable. */
 function solvableDeal(variant: "tripeaks" | "pyramid", from: number): number {
@@ -44,30 +50,40 @@ function solvableDeal(variant: "tripeaks" | "pyramid", from: number): number {
   return found?.dealNumber ?? from;
 }
 
-function getBestScore(key: string): number {
-  const v = localStorage.getItem(key);
-  return v ? parseInt(v, 10) : 0;
+/** Format seconds as m:ss, for stats. */
+const formatSeconds = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
+
+/** Loads the stats once, migrating any old best score. Only the stats file is written after this. */
+function loadStats(): StatsFile {
+  return migrateStats(localStorage.getItem(STATS_KEY), localStorage.getItem(LEGACY_BEST_KEY));
 }
 
 export default function App() {
   const [phase, setPhase] = useState<GamePhase>("playing");
   const [variant, setVariant] = useState<Variant>("klondike");
   const [dealNumber, setDealNumber] = useState(() => randomDealNumber());
+  const [seed, setSeed] = useState<number | undefined>(undefined);
+  const [isDaily, setIsDaily] = useState(false);
   const [dealInput, setDealInput] = useState("");
   const [score, setScore] = useState(0);
-  const [bestScore, setBestScore] = useState(() => getBestScore(bestKey("klondike")));
+  const [stats, setStats] = useState<StatsFile>(loadStats);
   const [gameKey, setGameKey] = useState(0);
   const [meta, setMeta] = useState({ moves: 0, time: "0:00", canUndo: false });
   const scoreRef = useRef(0);
+  const startedAt = useRef(Date.now());
   const gameRef = useRef<GameHandle>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const particleRef = useRef<ParticleLayerHandle>(null);
   const [celebrationId, setCelebrationId] = useState<string | null>(null);
   const { submitScore } = useLeaderboard("solitaire");
+  // One daily board per mode, so times from different games are never compared.
+  const dailyBoard = useLeaderboard(`solitaire-daily-${modeKey(variant)}`);
 
   useEffect(() => {
-    setBestScore(getBestScore(bestKey(variant)));
-  }, [variant]);
+    localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+  }, [stats]);
+
+  const bestScore = modeOf(stats, modeKey(variant)).bestScore;
 
   const handleScore = useCallback((s: number) => {
     scoreRef.current = s;
@@ -76,13 +92,18 @@ export default function App() {
 
   const handleGameOver = useCallback(() => {
     const final = scoreRef.current;
-    const key = bestKey(variant);
-    if (final > getBestScore(key)) {
-      localStorage.setItem(key, String(final));
-      setBestScore(final);
+    const seconds = Math.max(1, Math.round((Date.now() - startedAt.current) / 1000));
+    setStats((s) => recordWin(s, modeKey(variant), final, seconds));
+    if (isDaily) {
+      // A daily time is a score on the mode's daily board. The platform may refuse it, and that is not shown.
+      dailyBoard.submitScore(DAILY_SCORE_BASE - seconds).then(
+        () => undefined,
+        () => undefined,
+      );
+    } else if (variant === "klondike") {
+      // The shared leaderboard is for Klondike only. Other modes keep their scores locally.
+      submitScore(final);
     }
-    // The shared leaderboard is for Klondike only. Spider scores stay local for now.
-    if (variant === "klondike") submitScore(final);
     setPhase("won");
     // Burst from the middle of the board, then the confetti. Both skip under reduced motion.
     const board = boardRef.current;
@@ -95,22 +116,30 @@ export default function App() {
       });
     }
     setCelebrationId(`win-${Date.now()}`);
-  }, [submitScore, variant]);
+  }, [submitScore, dailyBoard.submitScore, variant, isDaily]);
 
   const endCelebration = useCallback(() => setCelebrationId(null), []);
 
-  /** Start a new game in the given mode. Changing mode always deals a new game. */
-  const start = useCallback((next: Variant, deal?: number) => {
+  /**
+   * Start a new game in the given mode. `deal` is the deal number to play, or a random one.
+   * A daily game passes today's number and sets `daily`.
+   */
+  const start = useCallback((next: Variant, deal?: number, daily = false) => {
     setVariant(next);
+    setIsDaily(daily);
+    setSeed(daily ? deal : undefined);
     if (next === "freecell") setDealNumber(deal ?? randomDealNumber());
     if (next === "tripeaks" || next === "pyramid") setDealNumber(solvableDeal(next, deal ?? randomDealNumber()));
     setScore(0);
     scoreRef.current = 0;
     setCelebrationId(null);
+    startedAt.current = Date.now();
+    setStats((s) => recordStart(s, modeKey(next)));
     setGameKey((k) => k + 1);
     setPhase("playing");
   }, []);
 
+  const today = dateKey();
   const numbered = variant === "freecell" || variant === "tripeaks" || variant === "pyramid";
 
   const rules =
@@ -205,7 +234,7 @@ export default function App() {
       }
     >
       <div className="flex flex-col w-full h-full">
-        <div className="flex flex-wrap justify-center gap-2 px-2 pt-2" role="group" aria-label="Game mode">
+        <div className="mode-bar flex flex-wrap justify-center gap-2 px-2 pt-2" role="group" aria-label="Game mode">
           {MODES.map((mode) => {
             const active = variant === mode.value;
             return (
@@ -223,6 +252,14 @@ export default function App() {
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={() => start(variant, dailyDealNumber(modeKey(variant), today), true)}
+            className="rounded-lg px-3 py-2 min-h-[2.75rem] text-xs font-bold"
+            style={{ background: "var(--panel)", color: "var(--ink)", border: "1px solid var(--line-strong)" }}
+          >
+            Today&apos;s deal
+          </button>
           {numbered && (
             <form
               className="flex items-center gap-2"
@@ -265,6 +302,18 @@ export default function App() {
             </form>
           )}
         </div>
+        <div className="stats-line px-2 pt-1 text-xs font-bold" style={{ color: "var(--muted)" }}>
+          {isDaily && <span style={{ color: "var(--accent)" }}>Daily deal, {today} (UTC) · </span>}
+          {(() => {
+            const m = modeOf(stats, modeKey(variant));
+            return (
+              <span>
+                Played {m.played} · Won {m.won} · Best {m.bestScore}
+                {m.bestSeconds !== null && ` · Fastest ${formatSeconds(m.bestSeconds)}`}
+              </span>
+            );
+          })()}
+        </div>
         <div ref={boardRef} className="relative w-full flex-1 min-h-0">
           {variant === "tripeaks" ? (
             <TriPeaks
@@ -298,6 +347,7 @@ export default function App() {
               key={gameKey}
               ref={gameRef}
               drawCount={1}
+              seed={seed}
               onScore={handleScore}
               onGameOver={handleGameOver}
               onMeta={setMeta}
@@ -307,6 +357,7 @@ export default function App() {
               key={gameKey}
               ref={gameRef}
               suits={variant}
+              seed={seed}
               onScore={handleScore}
               onGameOver={handleGameOver}
               onMeta={setMeta}

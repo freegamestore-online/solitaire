@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { useGameSounds } from "@freegamestore/games";
 import { CARD_H, CARD_W, CardView, EmptySlot, type GameHandle } from "./Game";
+import { seededRandom } from "../lib/random";
 import {
   COLUMNS,
   RUNS_TO_WIN,
@@ -19,6 +20,8 @@ interface Props {
   onGameOver: () => void;
   /** Reports moves / elapsed time / whether undo is available, for the topbar. */
   onMeta?: (m: { moves: number; time: string; canUndo: boolean }) => void;
+  /** Deal from this seed, for the daily deal. Omit it for a random deal. */
+  seed?: number;
 }
 
 /** A selected run: the column it sits in and the index of its top card. */
@@ -39,9 +42,9 @@ const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().p
  * Spider solitaire. Tap a face-up run to pick it up, then tap a column to drop it. Deal
  * from the stock with the pile at top left. Same interface as `Game`, so App can swap them.
  */
-export const Spider = forwardRef<GameHandle, Props>(function Spider({ suits, onScore, onGameOver, onMeta }, ref) {
+export const Spider = forwardRef<GameHandle, Props>(function Spider({ suits, onScore, onGameOver, onMeta, seed }, ref) {
   const sounds = useGameSounds();
-  const [state, setState] = useState<SpiderState>(() => newSpiderGame(suits));
+  const [state, setState] = useState<SpiderState>(() => newSpiderGame(suits, seed === undefined ? undefined : seededRandom(seed)));
   const [history, setHistory] = useState<SpiderState[]>([]);
   const [moves, setMoves] = useState(0);
   const [elapsed, setElapsed] = useState(0);

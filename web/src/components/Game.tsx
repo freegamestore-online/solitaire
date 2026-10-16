@@ -11,6 +11,7 @@ import {
   cardId,
 } from "../lib/cards";
 import { liftCard, dropCard, snapCard, cascadeDelay } from "../motion/card";
+import { seededRandom } from "../lib/random";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -38,6 +39,8 @@ interface Props {
   onGameOver: () => void;
   /** Reports moves / elapsed time / whether undo is available, for the topbar. */
   onMeta?: (m: { moves: number; time: string; canUndo: boolean }) => void;
+  /** Deal from this seed, for the daily deal. Omit it for a random deal. */
+  seed?: number;
 }
 
 /** Imperative handle so the topbar's Undo button can drive the game. */
@@ -58,8 +61,8 @@ function cloneState(s: GameState): GameState {
   };
 }
 
-function initGame(): GameState {
-  const deck = shuffleDeck(createDeck());
+function initGame(seed?: number): GameState {
+  const deck = shuffleDeck(createDeck(), seed === undefined ? undefined : seededRandom(seed));
   const tableau: Card[][] = [];
   let idx = 0;
   for (let col = 0; col < 7; col++) {
@@ -353,11 +356,11 @@ export function EmptySlot({
 /* ------------------------------------------------------------------ */
 
 export const Game = forwardRef<GameHandle, Props>(function Game(
-  { drawCount, onScore, onGameOver, onMeta },
+  { drawCount, onScore, onGameOver, onMeta, seed },
   ref,
 ) {
   const sounds = useGameSounds();
-  const [state, setState] = useState<GameState>(initGame);
+  const [state, setState] = useState<GameState>(() => initGame(seed));
   const [moves, setMoves] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [history, setHistory] = useState<MoveHistoryEntry[]>([]);

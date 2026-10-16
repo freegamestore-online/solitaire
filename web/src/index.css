@@ -68,6 +68,17 @@ body { margin: 0; height: 100dvh; overflow: hidden; background: var(--paper); co
   to { transform: translateX(100%); }
 }
 
+/* Light and dark: native controls follow the page theme. */
+:root { color-scheme: light dark; }
+
+/* Phones: the mode buttons share the row width, and the form and stats line wrap cleanly. */
+@media (max-width: 640px) {
+  .mode-bar { gap: 0.375rem; }
+  .mode-bar > button { flex: 1 1 calc(50% - 0.375rem); }
+  .mode-bar > form { flex: 1 1 100%; flex-wrap: wrap; justify-content: center; }
+  .stats-line { text-align: center; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .confetti-piece, .region-shimmer::after { display: none; }
 }
