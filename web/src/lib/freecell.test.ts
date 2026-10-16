@@ -173,6 +173,13 @@ describe("moving cards", () => {
     s.cascades[0] = [c("3", "hearts")];
     expect(moveCards(s, { type: "cascade", col: 0, index: 0 }, { type: "foundation", pile: 0 })).toBeNull();
   });
+
+  it("rejects a foundation target outside the four piles without throwing", () => {
+    const s = empty();
+    s.cascades[0] = [c("A", "hearts")];
+    expect(() => moveCards(s, { type: "cascade", col: 0, index: 0 }, { type: "foundation", pile: 4 })).not.toThrow();
+    expect(moveCards(s, { type: "cascade", col: 0, index: 0 }, { type: "foundation", pile: 4 })).toBeNull();
+  });
 });
 
 describe("auto-move", () => {

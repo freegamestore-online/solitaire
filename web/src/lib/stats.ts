@@ -71,6 +71,11 @@ export function recordStart(file: StatsFile, mode: string): StatsFile {
   return { ...file, modes: { ...file.modes, [mode]: { ...current, played: current.played + 1 } } };
 }
 
+/** Load saved stats and count the Klondike game shown on the first page load. */
+export function loadInitialStats(raw: string | null, legacyBest: string | null): StatsFile {
+  return recordStart(migrateStats(raw, legacyBest), "klondike");
+}
+
 export function recordWin(file: StatsFile, mode: string, score: number, seconds: number): StatsFile {
   const current = modeOf(file, mode);
   const next: ModeStats = {

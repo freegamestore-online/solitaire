@@ -148,6 +148,7 @@ export function moveCards(state: FreeCellState, source: Source, target: Target):
     if (source.type === "free" && source.cell === target.cell) return null;
   } else {
     if (moving.length !== 1) return null;
+    if (!Number.isInteger(target.pile) || target.pile < 0 || target.pile >= state.foundations.length) return null;
     if (!canEnterFoundation(lead, state.foundations[target.pile] ?? [])) return null;
   }
 

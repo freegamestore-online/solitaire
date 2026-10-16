@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STATS_VERSION, migrateStats, modeOf, recordStart, recordWin } from "./stats";
+import { STATS_VERSION, loadInitialStats, migrateStats, modeOf, recordStart, recordWin } from "./stats";
 
 describe("stats", () => {
   it("counts a start and a win for a mode, and keeps the best of each", () => {
@@ -46,5 +46,17 @@ describe("old-save migration", () => {
   it("zeroes non-numeric fields in a saved file", () => {
     const bad = JSON.stringify({ version: STATS_VERSION, modes: { klondike: { played: "many", won: 2, bestScore: NaN, bestSeconds: -1 } } });
     expect(modeOf(migrateStats(bad, null), "klondike")).toEqual({ played: 0, won: 2, bestScore: 0, bestSeconds: null });
+  });
+});
+
+describe("initial game stats", () => {
+  it("counts the Klondike game that starts on the first page load", () => {
+    const s = loadInitialStats(null, "4200");
+    expect(modeOf(s, "klondike")).toEqual({ played: 1, won: 0, bestScore: 4200, bestSeconds: null });
+  });
+
+  it("counts the initial game on top of saved stats", () => {
+    const saved = JSON.stringify({ version: STATS_VERSION, modes: { klondike: { played: 3, won: 1, bestScore: 900, bestSeconds: 600 } } });
+    expect(modeOf(loadInitialStats(saved, null), "klondike").played).toBe(4);
   });
 });

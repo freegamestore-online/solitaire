@@ -13,7 +13,7 @@ import { dailyDealNumber, dateKey } from "./lib/daily";
 import {
   LEGACY_BEST_KEY,
   STATS_KEY,
-  migrateStats,
+  loadInitialStats,
   modeOf,
   recordStart,
   recordWin,
@@ -55,7 +55,7 @@ const formatSeconds = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString(
 
 /** Loads the stats once, migrating any old best score. Only the stats file is written after this. */
 function loadStats(): StatsFile {
-  return migrateStats(localStorage.getItem(STATS_KEY), localStorage.getItem(LEGACY_BEST_KEY));
+  return loadInitialStats(localStorage.getItem(STATS_KEY), localStorage.getItem(LEGACY_BEST_KEY));
 }
 
 export default function App() {
