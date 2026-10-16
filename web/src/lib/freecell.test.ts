@@ -4,6 +4,7 @@ import {
   CASCADES,
   FREE_CELLS,
   MAX_DEAL,
+  parseDealNumber,
   autoMove,
   dealFreeCell,
   isFreeCellWon,
@@ -31,6 +32,16 @@ function empty(): FreeCellState {
 }
 
 describe("deal generator", () => {
+  it("accepts only whole deal numbers in the supported range", () => {
+    expect(parseDealNumber("1")).toBe(1);
+    expect(parseDealNumber(String(MAX_DEAL))).toBe(MAX_DEAL);
+    expect(parseDealNumber("1.4")).toBeNull();
+    expect(parseDealNumber("1e2")).toBeNull();
+    expect(parseDealNumber("")).toBeNull();
+    expect(parseDealNumber("0")).toBeNull();
+    expect(parseDealNumber(String(MAX_DEAL + 1))).toBeNull();
+  });
+
   it("runs the linear congruential generator (seed 1 gives 41 first)", () => {
     // 1 * 214013 + 2531011 = 2745024; (2745024 >> 16) & 0x7fff = 41.
     expect(makeRand(1)()).toBe(41);

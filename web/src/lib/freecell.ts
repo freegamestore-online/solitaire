@@ -5,6 +5,13 @@ export const MAX_DEAL = 32000;
 export const CASCADES = 8;
 export const FREE_CELLS = 4;
 
+/** Parse a numbered deal without silently rounding a fractional input. */
+export function parseDealNumber(input: string): number | null {
+  if (!/^\d+$/.test(input)) return null;
+  const dealNumber = Number(input);
+  return Number.isSafeInteger(dealNumber) && dealNumber >= 1 && dealNumber <= MAX_DEAL ? dealNumber : null;
+}
+
 export interface FreeCellState {
   /** 8 columns, bottom card first. All cards are face up. */
   cascades: Card[][];

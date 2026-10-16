@@ -5,7 +5,7 @@ import { Spider } from "./components/Spider";
 import { FreeCell } from "./components/FreeCell";
 import { TriPeaks } from "./components/TriPeaks";
 import { Pyramid } from "./components/Pyramid";
-import { MAX_DEAL, randomDealNumber } from "./lib/freecell";
+import { MAX_DEAL, parseDealNumber, randomDealNumber } from "./lib/freecell";
 import { dealTriPeaks, triPeaksPuzzle } from "./lib/tripeaks";
 import { dealPyramid, pyramidPuzzle } from "./lib/pyramid";
 import { findSolvableDeal } from "./lib/solver";
@@ -265,8 +265,8 @@ export default function App() {
               className="flex items-center gap-2"
               onSubmit={(e) => {
                 e.preventDefault();
-                const n = Math.round(Number(dealInput));
-                if (Number.isInteger(n) && n >= 1 && n <= MAX_DEAL) start(variant, n);
+                const n = parseDealNumber(dealInput);
+                if (n !== null) start(variant, n);
                 setDealInput("");
               }}
             >
