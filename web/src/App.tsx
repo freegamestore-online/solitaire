@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { GameShell, GameTopbar, GameAuth } from "@freegamestore/games";
 import { Game, type GameHandle } from "./components/Game";
 import { Spider } from "./components/Spider";
+import { FreeCell } from "./components/FreeCell";
+import { MAX_DEAL, randomDealNumber } from "./lib/freecell";
 import { useLeaderboard } from '@freegamestore/games';
 import { Celebration, ParticleLayer, type ParticleLayerHandle } from "./feel";
 import type { GamePhase, Variant } from "./types";
@@ -14,11 +16,14 @@ const MODES: { value: Variant; label: string }[] = [
   { value: 1, label: "Spider · 1 suit" },
   { value: 2, label: "Spider · 2 suits" },
   { value: 4, label: "Spider · 4 suits" },
+  { value: "freecell", label: "FreeCell" },
 ];
 
 /** Klondike keeps the original best-score key, so existing players keep their best. Spider gets its own per suit count. */
 function bestKey(variant: Variant): string {
-  return variant === "klondike" ? BEST_SCORE_KEY : `freesolitaire-spider-${variant}-best`;
+  if (variant === "klondike") return BEST_SCORE_KEY;
+  if (variant === "freecell") return "freesolitaire-freecell-best";
+  return `freesolitaire-spider-${variant}-best`;
 }
 
 function getBestScore(key: string): number {
@@ -29,6 +34,8 @@ function getBestScore(key: string): number {
 export default function App() {
   const [phase, setPhase] = useState<GamePhase>("playing");
   const [variant, setVariant] = useState<Variant>("klondike");
+  const [dealNumber, setDealNumber] = useState(() => randomDealNumber());
+  const [dealInput, setDealInput] = useState("");
   const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(() => getBestScore(bestKey("klondike")));
   const [gameKey, setGameKey] = useState(0);
@@ -75,8 +82,9 @@ export default function App() {
   const endCelebration = useCallback(() => setCelebrationId(null), []);
 
   /** Start a new game in the given mode. Changing mode always deals a new game. */
-  const start = useCallback((next: Variant) => {
+  const start = useCallback((next: Variant, deal?: number) => {
     setVariant(next);
+    if (next === "freecell") setDealNumber(deal ?? randomDealNumber());
     setScore(0);
     scoreRef.current = 0;
     setCelebrationId(null);
@@ -85,7 +93,19 @@ export default function App() {
   }, []);
 
   const rules =
-    variant === "klondike" ? (
+    variant === "freecell" ? (
+      <div>
+        <h3 style={{ fontWeight: 700 }}>FreeCell, deal #{dealNumber}</h3>
+        <h4 style={{ fontWeight: 600 }}>Rules</h4>
+        <ul>
+          <li>Build foundations from Ace to King by suit</li>
+          <li>Columns build down in alternating colours</li>
+          <li>Four free cells hold any card. Moves of several cards are limited by the free cells and empty columns</li>
+        </ul>
+        <h4 style={{ fontWeight: 600 }}>Controls</h4>
+        <ul><li>Tap a card to pick it up, then tap a free cell, a column or a foundation to drop it</li><li>Safe cards move to their foundations by themselves</li></ul>
+      </div>
+    ) : variant === "klondike" ? (
       <div>
         <h3 style={{ fontWeight: 700 }}>Klondike Solitaire</h3>
         <h4 style={{ fontWeight: 600 }}>Rules</h4>
@@ -158,9 +178,59 @@ export default function App() {
               </button>
             );
           })}
+          {variant === "freecell" && (
+            <form
+              className="flex items-center gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const n = Math.round(Number(dealInput));
+                if (Number.isInteger(n) && n >= 1 && n <= MAX_DEAL) start("freecell", n);
+                setDealInput("");
+              }}
+            >
+              <label className="text-xs font-bold" style={{ color: "var(--muted)" }} htmlFor="deal-number">
+                Deal #{dealNumber}
+              </label>
+              <input
+                id="deal-number"
+                type="number"
+                min={1}
+                max={MAX_DEAL}
+                value={dealInput}
+                onChange={(e) => setDealInput(e.target.value)}
+                placeholder="1–32000"
+                className="rounded-lg px-2 py-1 w-28 text-xs"
+                style={{ background: "var(--panel)", color: "var(--ink)", border: "1px solid var(--line-strong)" }}
+              />
+              <button
+                type="submit"
+                className="rounded-lg px-3 py-2 min-h-[2.75rem] text-xs font-bold"
+                style={{ background: "var(--accent)", color: "#fff" }}
+              >
+                Play deal
+              </button>
+              <button
+                type="button"
+                onClick={() => start("freecell")}
+                className="rounded-lg px-3 py-2 min-h-[2.75rem] text-xs font-bold"
+                style={{ background: "var(--line)", color: "var(--ink)" }}
+              >
+                Random
+              </button>
+            </form>
+          )}
         </div>
         <div ref={boardRef} className="relative w-full flex-1 min-h-0">
-          {variant === "klondike" ? (
+          {variant === "freecell" ? (
+            <FreeCell
+              key={gameKey}
+              ref={gameRef}
+              dealNumber={dealNumber}
+              onScore={handleScore}
+              onGameOver={handleGameOver}
+              onMeta={setMeta}
+            />
+          ) : variant === "klondike" ? (
             <Game
               key={gameKey}
               ref={gameRef}
