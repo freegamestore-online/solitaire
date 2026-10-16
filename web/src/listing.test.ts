@@ -41,6 +41,16 @@ describe("listing copy", () => {
   });
 });
 
+describe("Klondike controls copy", () => {
+  it("does not advertise a draw mode that the app does not offer", () => {
+    expect(read("src/App.tsx")).not.toMatch(/Draw 1 or Draw 3 mode available/);
+  });
+
+  it("disables undo once the win overlay is shown", () => {
+    expect(read("src/App.tsx")).toContain('disabled={!meta.canUndo || phase === "won"}');
+  });
+});
+
 describe("theme and phones", () => {
   it("declares color-scheme so native controls follow light and dark", () => {
     expect(read("index.html")).toContain('name="color-scheme" content="light dark"');

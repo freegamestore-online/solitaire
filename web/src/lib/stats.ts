@@ -56,7 +56,7 @@ export function migrateStats(raw: string | null, legacyBest: string | null): Sta
       // Fall through to the legacy path, as for a missing file.
     }
   }
-  const best = legacyBest === null ? 0 : nonNegative(parseInt(legacyBest, 10));
+  const best = legacyBest !== null && /^\d+$/.test(legacyBest) ? nonNegative(Number(legacyBest)) : 0;
   const modes: Record<string, ModeStats> = {};
   if (best > 0) modes.klondike = { ...emptyMode(), bestScore: best };
   return { version: STATS_VERSION, modes };

@@ -45,8 +45,8 @@ const modeKey = (variant: Variant): string => String(variant);
 function solvableDeal(variant: "tripeaks" | "pyramid", from: number): number {
   const found =
     variant === "tripeaks"
-      ? findSolvableDeal(from, dealTriPeaks, triPeaksPuzzle)
-      : findSolvableDeal(from, dealPyramid, pyramidPuzzle);
+      ? findSolvableDeal(from, dealTriPeaks, triPeaksPuzzle, { maxDeal: MAX_DEAL })
+      : findSolvableDeal(from, dealPyramid, pyramidPuzzle, { maxDeal: MAX_DEAL });
   return found?.dealNumber ?? from;
 }
 
@@ -185,7 +185,7 @@ export default function App() {
         <h4 style={{ fontWeight: 600 }}>Rules</h4>
         <ul><li>Build foundation piles from Ace to King by suit</li><li>Tableau builds down in alternating colors</li></ul>
         <h4 style={{ fontWeight: 600 }}>Controls</h4>
-        <ul><li>Tap to select a card, tap to place it</li><li>Draw 1 or Draw 3 mode available</li></ul>
+        <ul><li>Tap to select a card, tap to place it</li><li>Draw one card from the stock at a time</li></ul>
       </div>
     ) : (
       <div>
@@ -217,7 +217,7 @@ export default function App() {
               <button
                 aria-label="Undo"
                 onClick={() => gameRef.current?.undo()}
-                disabled={!meta.canUndo}
+                disabled={!meta.canUndo || phase === "won"}
                 className="rounded-lg px-3 py-2 min-h-[2.75rem] text-xs font-bold transition disabled:opacity-40"
                 style={{
                   background: meta.canUndo ? "var(--accent)" : "var(--line)",

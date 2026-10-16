@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { solve, type Puzzle } from "./solver";
+import { findSolvableDeal, solve, type Puzzle } from "./solver";
 
 // A toy game: a counter climbs from 0 by 1 or 2, and wins at `goal`.
 const climb = (goal: number): Puzzle<number, number> => ({
@@ -21,5 +21,16 @@ describe("generic solver", () => {
 
   it("stops and reports unknown when the budget runs out", () => {
     expect(solve(0, climb(50), 3)).toBe("unknown");
+  });
+
+  it("wraps numbered deals at the maximum without returning an invalid deal number", () => {
+    const found = findSolvableDeal(3, (n) => n, {
+      moves: () => [],
+      apply: (n) => n,
+      key: String,
+      won: (n) => n === 1,
+    }, { tries: 2, maxDeal: 3 });
+
+    expect(found?.dealNumber).toBe(1);
   });
 });

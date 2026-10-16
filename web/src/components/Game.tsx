@@ -12,6 +12,7 @@ import {
 } from "../lib/cards";
 import { liftCard, dropCard, snapCard, cascadeDelay } from "../motion/card";
 import { seededRandom } from "../lib/random";
+import { drawKlondikeStock } from "../lib/klondike";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -405,23 +406,20 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
       const step = cascadeStepRef.current++;
       const snapLater = (id: string) =>
         window.setTimeout(() => cardElements(boardRef.current, [id]).forEach((el) => snapCard(el)), cascadeDelay(step));
-      setState((prev) => {
-        const next = cloneState(prev);
-        // Try to move one card to foundation
-        // Check waste first
-        if (next.waste.length > 0) {
-          const card = next.waste[next.waste.length - 1]!;
-          for (let f = 0; f < 4; f++) {
-            if (canPlaceOnFoundation(card, next.foundations[f]!)) {
-              next.foundations[f]!.push({ ...card, faceUp: true });
-              next.waste.pop();
-              setMoves((m) => m + 1);
-              snapLater(cardId(card));
-              return next;
-            }
+      const next = cloneState(state);
+      let movedCard: Card | null = null;
+      if (next.waste.length > 0) {
+        const card = next.waste[next.waste.length - 1]!;
+        for (let f = 0; f < 4; f++) {
+          if (canPlaceOnFoundation(card, next.foundations[f]!)) {
+            next.foundations[f]!.push({ ...card, faceUp: true });
+            next.waste.pop();
+            movedCard = card;
+            break;
           }
         }
-        // Check tableau columns
+      }
+      if (!movedCard) {
         for (let c = 0; c < 7; c++) {
           const col = next.tableau[c]!;
           if (col.length === 0) continue;
@@ -430,16 +428,20 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
             if (canPlaceOnFoundation(card, next.foundations[f]!)) {
               next.foundations[f]!.push({ ...card, faceUp: true });
               col.pop();
-              setMoves((m) => m + 1);
-              snapLater(cardId(card));
-              return next;
+              movedCard = card;
+              break;
             }
           }
+          if (movedCard) break;
         }
-        // Nothing to move — done
+      }
+      if (movedCard) {
+        setMoves((m) => m + 1);
+        snapLater(cardId(movedCard));
+        setState(next);
+      } else {
         setAutoCompleting(false);
-        return prev;
-      });
+      }
     }, 150);
     return () => clearTimeout(timer);
   }, [autoCompleting, state]);
@@ -474,39 +476,24 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
   );
 
   const undo = useCallback(() => {
-    setHistory((h) => {
-      if (h.length === 0) return h;
-      const prev = h[h.length - 1]!.prev;
-      setState(prev);
-      setMoves((m) => m + 1);
-      return h.slice(0, -1);
-    });
-  }, []);
+    const entry = history[history.length - 1];
+    if (!entry) return;
+    setHistory(history.slice(0, -1));
+    setState(entry.prev);
+    setMoves((m) => m + 1);
+  }, [history]);
 
   useImperativeHandle(ref, () => ({ undo }), [undo]);
 
   /* ---- Stock click ---- */
   const drawFromStock = useCallback(() => {
     setSelected(null);
-    setState((prev) => {
-      pushHistory(prev);
-      const next = cloneState(prev);
-      if (next.stock.length === 0) {
-        // Reset: waste back to stock (reversed)
-        next.stock = next.waste.reverse().map((c) => ({ ...c, faceUp: false }));
-        next.waste = [];
-      } else {
-        const count = Math.min(drawCount, next.stock.length);
-        for (let i = 0; i < count; i++) {
-          const card = next.stock.pop()!;
-          card.faceUp = true;
-          next.waste.push(card);
-        }
-      }
-      setMoves((m) => m + 1);
-      return next;
-    });
-  }, [drawCount, pushHistory]);
+    const piles = drawKlondikeStock(state.stock, state.waste, drawCount);
+    if (!piles) return;
+    pushHistory(state);
+    setState({ ...state, stock: piles.stock, waste: piles.waste });
+    setMoves((m) => m + 1);
+  }, [drawCount, pushHistory, state]);
 
   /* ---- Selection / move logic (two-tap) ---- */
 

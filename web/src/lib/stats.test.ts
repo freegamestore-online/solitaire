@@ -32,6 +32,7 @@ describe("old-save migration", () => {
   it("treats a damaged legacy value as no score", () => {
     expect(migrateStats(null, "not a number").modes).toEqual({});
     expect(migrateStats(null, "-50").modes).toEqual({});
+    expect(migrateStats(null, "4200oops").modes).toEqual({});
   });
 
   it("treats damaged stats JSON as no file, and falls back to the legacy key", () => {

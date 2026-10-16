@@ -51,9 +51,11 @@ export function findSolvableDeal<S, M>(
   from: number,
   build: (dealNumber: number) => S,
   puzzle: Puzzle<S, M>,
-  { tries = 200, budget = DEFAULT_BUDGET }: { tries?: number; budget?: number } = {},
+  { tries = 200, budget = DEFAULT_BUDGET, maxDeal }: { tries?: number; budget?: number; maxDeal?: number } = {},
 ): { dealNumber: number; state: S } | null {
-  for (let n = from; n < from + tries; n++) {
+  const attempts = maxDeal === undefined ? tries : Math.min(tries, maxDeal);
+  for (let offset = 0; offset < attempts; offset++) {
+    const n = maxDeal === undefined ? from + offset : ((from - 1 + offset) % maxDeal) + 1;
     const state = build(n);
     if (solve(state, puzzle, budget) === "solved") return { dealNumber: n, state };
   }
