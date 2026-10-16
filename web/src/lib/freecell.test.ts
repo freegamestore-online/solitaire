@@ -18,6 +18,10 @@ import {
 
 const c = (value: Value, suit: Suit): Card => ({ value, suit, faceUp: true });
 
+/** Short card code in the published style: rank then suit letter, e.g. JD, 6S. */
+const SUIT_LETTER: Record<Suit, string> = { clubs: "C", diamonds: "D", hearts: "H", spades: "S" };
+const code = (card: Card): string => `${card.value}${SUIT_LETTER[card.suit]}`;
+
 function empty(): FreeCellState {
   return {
     cascades: Array.from({ length: CASCADES }, () => []),
@@ -64,11 +68,26 @@ describe("deal generator", () => {
     }
   });
 
-  // Pending: the generator above has NOT been checked against Microsoft's published
-  // deals. Deal #1 starts JD in the plan, but no tested variant of the shuffle gave that
-  // opening. Replace this with real known-deal vectors once a verified source is found.
-  it.todo("matches Microsoft deal #1 column by column (needs a verified reference)");
-});
+  it("deals Game #1 with the published first row (JD 2D 9H JC 5D 7H 7C 5H)", () => {
+    // Source: Rosetta Code, "Deal cards for FreeCell". The first eight dealt cards are the
+    // top card of each column, left to right.
+    const s = dealFreeCell(1);
+    expect(s.cascades.map((col) => code(col[0]!))).toEqual(["JD", "2D", "9H", "JC", "5D", "7H", "7C", "5H"]);
+  });
+
+  it("deals Game #1 with the published last row (6S 9C 2H 6H)", () => {
+    // The last row of the published table is the bottom card of the four 7-card columns.
+    const s = dealFreeCell(1);
+    expect(s.cascades.slice(0, 4).map((col) => code(col[col.length - 1]!))).toEqual(["6S", "9C", "2H", "6H"]);
+  });
+
+  it("gives the same cards in the same order for every deal number, shuffled deterministically", () => {
+    const a = dealFreeCell(617).cascades.map((col) => col.map(code));
+    const b = dealFreeCell(617).cascades.map((col) => col.map(code));
+    expect(a).toEqual(b);
+  });
+
+  });
 
 describe("sequence and supermove rules", () => {
   it("accepts alternating colours, each one rank lower", () => {

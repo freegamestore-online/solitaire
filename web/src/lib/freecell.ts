@@ -1,4 +1,4 @@
-import { SUITS, valueIndex, isRed, type Card, type Suit } from "./cards";
+import { SUITS, valueIndex, isRed, type Card, type Suit, type Value } from "./cards";
 
 /** Deal numbers run from 1 to 32000, as in the classic numbered deals. */
 export const MAX_DEAL = 32000;
@@ -29,26 +29,37 @@ export function makeRand(seed: number): () => number {
 const rankOf = (card: Card): number => valueIndex(card.value);
 
 /**
- * Deal a numbered game. The 52 cards are taken in clubs, diamonds, hearts, spades
- * order, shuffled with the generator above, then dealt to the eight columns in turn.
- * Columns 1–4 get 7 cards and columns 5–8 get 6.
+ * Deal a numbered game, as the classic Microsoft deals were dealt. The deck is indexed
+ * rank-major (index = rank × 4 + suit, ranks A–K, suits clubs, diamonds, hearts, spades).
+ * It is shuffled from the last position down, swapping each with a random earlier-or-same
+ * position. Then cards are dealt from the end of the deck, one to each column in turn,
+ * so the first eight cards become the top card of each column. Columns 1–4 get 7 cards
+ * and columns 5–8 get 6.
+ *
+ * Checked against the published Game #1 layout: the first row is JD 2D 9H JC 5D 7H 7C 5H
+ * and the last row is 6S 9C 2H 6H (Rosetta Code, "Deal cards for FreeCell").
  */
 export function dealFreeCell(dealNumber: number): FreeCellState {
-  const order: Suit[] = ["clubs", "diamonds", "hearts", "spades"];
-  const deck: Card[] = [];
-  for (const suit of order) {
-    for (const value of ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"] as const) {
-      deck.push({ suit, value, faceUp: true });
-    }
-  }
   const rand = makeRand(dealNumber);
+  const deck: number[] = Array.from({ length: 52 }, (_, i) => i);
   for (let i = 51; i >= 1; i--) {
     const j = rand() % (i + 1);
     [deck[i], deck[j]] = [deck[j]!, deck[i]!];
   }
   const cascades: Card[][] = Array.from({ length: CASCADES }, () => []);
-  deck.forEach((card, k) => cascades[k % CASCADES]!.push(card));
+  for (let k = 0; k < 52; k++) {
+    const index = deck[51 - k]!;
+    cascades[k % CASCADES]!.push(cardFromIndex(index));
+  }
   return { cascades, freeCells: Array(FREE_CELLS).fill(null), foundations: SUITS.map(() => []) };
+}
+
+const RANK_ORDER: Value[] = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+const SUIT_ORDER: Suit[] = ["clubs", "diamonds", "hearts", "spades"];
+
+/** The card for a rank-major deck index: rank = index / 4, suit = index % 4. */
+function cardFromIndex(index: number): Card {
+  return { value: RANK_ORDER[Math.floor(index / 4)]!, suit: SUIT_ORDER[index % 4]!, faceUp: true };
 }
 
 /** A random deal number, so an unplayed game can still be shared by number. */
