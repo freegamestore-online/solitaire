@@ -197,11 +197,11 @@ function cardElements(board: HTMLElement | null, ids: string[]): HTMLElement[] {
 /*  Card Component                                                     */
 /* ------------------------------------------------------------------ */
 
-const CARD_W = 72;
-const CARD_H = 100;
+export const CARD_W = 72;
+export const CARD_H = 100;
 const FACE_DOWN_COLOR = "#2563eb";
 
-function CardView({
+export function CardView({
   card,
   style,
   selected,
@@ -309,7 +309,7 @@ function CardView({
   );
 }
 
-function EmptySlot({
+export function EmptySlot({
   label,
   style,
   onClick,
