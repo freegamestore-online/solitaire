@@ -185,6 +185,13 @@ describe("moving cards", () => {
     expect(moveCards(s, { type: "cascade", col: 0, index: 0 }, { type: "foundation", pile: 0 })).toBeNull();
   });
 
+  it("keeps each FreeCell foundation assigned to its matching suit", () => {
+    const s = empty();
+    s.cascades[0] = [c("A", "spades")];
+    expect(moveCards(s, { type: "cascade", col: 0, index: 0 }, { type: "foundation", pile: SUITS.indexOf("hearts") })).toBeNull();
+    expect(moveCards(s, { type: "cascade", col: 0, index: 0 }, { type: "foundation", pile: SUITS.indexOf("spades") })?.foundations[SUITS.indexOf("spades")]).toHaveLength(1);
+  });
+
   it("rejects a foundation target outside the four piles without throwing", () => {
     const s = empty();
     s.cascades[0] = [c("A", "hearts")];
