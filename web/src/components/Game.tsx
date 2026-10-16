@@ -10,6 +10,7 @@ import {
   shuffleDeck,
   cardId,
 } from "../lib/cards";
+import { liftCard, dropCard, snapCard, cascadeDelay } from "../motion/card";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -171,6 +172,27 @@ function computeMove(
   return null;
 }
 
+/** The cards a selection covers, bottom first. Used to find the DOM nodes to lift or snap. */
+function selectedCardIds(s: GameState, loc: Location | null): string[] {
+  if (!loc) return [];
+  if (loc.type === "waste") {
+    const top = s.waste[s.waste.length - 1];
+    return top ? [cardId(top)] : [];
+  }
+  if (loc.type === "foundation") {
+    const pile = s.foundations[loc.pile]!;
+    const top = pile[pile.length - 1];
+    return top ? [cardId(top)] : [];
+  }
+  return s.tableau[loc.col]!.slice(loc.cardIndex).map(cardId);
+}
+
+/** DOM nodes for the given card ids, found by their `data-card` attribute. */
+function cardElements(board: HTMLElement | null, ids: string[]): HTMLElement[] {
+  if (!board) return [];
+  return ids.flatMap((id) => Array.from(board.querySelectorAll<HTMLElement>(`[data-card="${id}"]`)));
+}
+
 /* ------------------------------------------------------------------ */
 /*  Card Component                                                     */
 /* ------------------------------------------------------------------ */
@@ -196,6 +218,7 @@ function CardView({
   if (!card.faceUp) {
     return (
       <div
+        data-card={cardId(card)}
         onClick={onClick}
         style={{
           width: CARD_W,
@@ -228,6 +251,7 @@ function CardView({
 
   return (
     <div
+      data-card={cardId(card)}
       onClick={onClick}
       style={{
         width: CARD_W,
@@ -339,8 +363,12 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
   const [history, setHistory] = useState<MoveHistoryEntry[]>([]);
   const [selected, setSelected] = useState<Location | null>(null);
   const [autoCompleting, setAutoCompleting] = useState(false);
+  const [landedIds, setLandedIds] = useState<string[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wonRef = useRef(false);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const liftedRef = useRef<HTMLElement[]>([]);
+  const cascadeStepRef = useRef(0);
 
   // Timer
   useEffect(() => {
@@ -361,15 +389,19 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
     if (isWon(state) && !wonRef.current) {
       wonRef.current = true;
       if (timerRef.current) clearInterval(timerRef.current);
-      sounds.playClear();
+      // The win sound comes from the Celebration in App, so it is not played here.
       onGameOver();
     }
   }, [state, onGameOver, sounds]);
 
-  // Auto-complete
+  // Auto-complete. Each card that lands on a foundation springs into place,
+  // staggered so the cascade reads as a sequence (cascadeDelay is 0 under reduced motion).
   useEffect(() => {
     if (!autoCompleting) return;
     const timer = setTimeout(() => {
+      const step = cascadeStepRef.current++;
+      const snapLater = (id: string) =>
+        window.setTimeout(() => cardElements(boardRef.current, [id]).forEach((el) => snapCard(el)), cascadeDelay(step));
       setState((prev) => {
         const next = cloneState(prev);
         // Try to move one card to foundation
@@ -381,6 +413,7 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
               next.foundations[f]!.push({ ...card, faceUp: true });
               next.waste.pop();
               setMoves((m) => m + 1);
+              snapLater(cardId(card));
               return next;
             }
           }
@@ -395,6 +428,7 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
               next.foundations[f]!.push({ ...card, faceUp: true });
               col.pop();
               setMoves((m) => m + 1);
+              snapLater(cardId(card));
               return next;
             }
           }
@@ -410,9 +444,24 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
   // Check for auto-complete eligibility after each move
   useEffect(() => {
     if (!autoCompleting && !wonRef.current && allFaceUp(state)) {
+      cascadeStepRef.current = 0;
       setAutoCompleting(true);
     }
   }, [state, autoCompleting]);
+
+  // Lift the selected card(s) while they are picked up, and drop them when the selection changes.
+  useEffect(() => {
+    liftedRef.current.forEach(dropCard);
+    liftedRef.current = cardElements(boardRef.current, selectedCardIds(state, selected));
+    liftedRef.current.forEach(liftCard);
+  }, [selected, state]);
+
+  // Snap the cards that a player move just landed.
+  useEffect(() => {
+    if (landedIds.length === 0) return;
+    cardElements(boardRef.current, landedIds).forEach((el) => snapCard(el));
+    setLandedIds([]);
+  }, [landedIds]);
 
   const pushHistory = useCallback(
     (s: GameState) => {
@@ -477,6 +526,7 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
       const result = computeMove(state, from, to);
       if (!result) return false;
       pushHistory(state);
+      setLandedIds(selectedCardIds(state, from));
       setState(result.next);
       setMoves((m) => m + 1);
       if (result.sound === "move") sounds.playMove();
@@ -641,6 +691,7 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
         }}
       >
         <div
+          ref={boardRef}
           style={{
             position: "relative",
             width: boardWidth + 16,

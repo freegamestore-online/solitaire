@@ -47,3 +47,31 @@
 html { height: 100%; overflow: hidden; }
 body { margin: 0; height: 100dvh; overflow: hidden; background: var(--paper); color: var(--ink); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 #root { height: 100%; overflow: hidden; }
+
+/* Feel kit: solve celebration (Celebration.tsx). Confetti pieces fall with the
+   --dx and --rot values set inline; the banner sits over the grid. */
+.celebration { position: absolute; inset: 0; overflow: hidden; pointer-events: none; display: flex; align-items: center; justify-content: center; z-index: 750; }
+.confetti-piece { position: absolute; top: -12px; width: 8px; height: 12px; opacity: 0.9; animation-name: confetti-fall; animation-timing-function: ease-in; animation-fill-mode: both; background: var(--accent); }
+.confetti-piece:nth-child(4n+1) { background: var(--success); }
+.confetti-piece:nth-child(4n+2) { background: var(--warning); }
+.confetti-piece:nth-child(4n+3) { background: #ec4899; }
+.celebrate-banner { font-family: "Fraunces", serif; font-size: 2rem; font-weight: 700; color: var(--success); background: var(--glass); padding: 0.5rem 1rem; border-radius: 0.75rem; }
+@keyframes confetti-fall {
+  from { transform: translate3d(0, 0, 0) rotate(0deg); }
+  to { transform: translate3d(var(--dx), 110vh, 0) rotate(var(--rot)); }
+}
+
+/* Feel kit: row, column or box complete shimmer (App.tsx celebrateRegions). */
+.region-shimmer::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, transparent 35%, color-mix(in srgb, var(--success) 35%, transparent) 50%, transparent 65%); animation: region-shimmer 700ms ease-out both; }
+@keyframes region-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti-piece, .region-shimmer::after { display: none; }
+}
+
+/* Card motion (motion/card.ts): a picked-up card rises and gains a shadow.
+   !important so it overrides the inline selection offset on tableau cards. */
+.card--lifted { transform: translateY(-4px) scale(1.04) !important; transition: transform 150ms ease, box-shadow 150ms ease !important; box-shadow: 0 8px 16px rgba(0,0,0,0.3) !important; }
