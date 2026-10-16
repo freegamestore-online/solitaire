@@ -3,7 +3,12 @@ import { GameShell, GameTopbar, GameAuth } from "@freegamestore/games";
 import { Game, type GameHandle } from "./components/Game";
 import { Spider } from "./components/Spider";
 import { FreeCell } from "./components/FreeCell";
+import { TriPeaks } from "./components/TriPeaks";
+import { Pyramid } from "./components/Pyramid";
 import { MAX_DEAL, randomDealNumber } from "./lib/freecell";
+import { dealTriPeaks, triPeaksPuzzle } from "./lib/tripeaks";
+import { dealPyramid, pyramidPuzzle } from "./lib/pyramid";
+import { findSolvableDeal } from "./lib/solver";
 import { useLeaderboard } from '@freegamestore/games';
 import { Celebration, ParticleLayer, type ParticleLayerHandle } from "./feel";
 import type { GamePhase, Variant } from "./types";
@@ -17,13 +22,26 @@ const MODES: { value: Variant; label: string }[] = [
   { value: 2, label: "Spider · 2 suits" },
   { value: 4, label: "Spider · 4 suits" },
   { value: "freecell", label: "FreeCell" },
+  { value: "tripeaks", label: "TriPeaks" },
+  { value: "pyramid", label: "Pyramid" },
 ];
 
 /** Klondike keeps the original best-score key, so existing players keep their best. Spider gets its own per suit count. */
 function bestKey(variant: Variant): string {
   if (variant === "klondike") return BEST_SCORE_KEY;
   if (variant === "freecell") return "freesolitaire-freecell-best";
+  if (variant === "tripeaks") return "freesolitaire-tripeaks-best";
+  if (variant === "pyramid") return "freesolitaire-pyramid-best";
   return `freesolitaire-spider-${variant}-best`;
+}
+
+/** The first deal at or after `from` that the solver can win. Falls back to `from` if none of the next few is solvable. */
+function solvableDeal(variant: "tripeaks" | "pyramid", from: number): number {
+  const found =
+    variant === "tripeaks"
+      ? findSolvableDeal(from, dealTriPeaks, triPeaksPuzzle)
+      : findSolvableDeal(from, dealPyramid, pyramidPuzzle);
+  return found?.dealNumber ?? from;
 }
 
 function getBestScore(key: string): number {
@@ -85,6 +103,7 @@ export default function App() {
   const start = useCallback((next: Variant, deal?: number) => {
     setVariant(next);
     if (next === "freecell") setDealNumber(deal ?? randomDealNumber());
+    if (next === "tripeaks" || next === "pyramid") setDealNumber(solvableDeal(next, deal ?? randomDealNumber()));
     setScore(0);
     scoreRef.current = 0;
     setCelebrationId(null);
@@ -92,8 +111,34 @@ export default function App() {
     setPhase("playing");
   }, []);
 
+  const numbered = variant === "freecell" || variant === "tripeaks" || variant === "pyramid";
+
   const rules =
-    variant === "freecell" ? (
+    variant === "tripeaks" ? (
+      <div>
+        <h3 style={{ fontWeight: 700 }}>TriPeaks, deal #{dealNumber}</h3>
+        <h4 style={{ fontWeight: 600 }}>Rules</h4>
+        <ul>
+          <li>Clear the three peaks by playing cards one rank above or below the waste card</li>
+          <li>Ace and King are neighbours. Every deal is checked to be winnable</li>
+          <li>Build a streak by playing cards in a row without turning over the stock</li>
+        </ul>
+        <h4 style={{ fontWeight: 600 }}>Controls</h4>
+        <ul><li>Tap a free card to play it onto the waste</li><li>Tap the stock pile to turn over the next card</li></ul>
+      </div>
+    ) : variant === "pyramid" ? (
+      <div>
+        <h3 style={{ fontWeight: 700 }}>Pyramid, deal #{dealNumber}</h3>
+        <h4 style={{ fontWeight: 600 }}>Rules</h4>
+        <ul>
+          <li>Remove pairs of free cards that add up to 13. Ace counts as 1, Jack 11, Queen 12, King 13</li>
+          <li>A King is removed on its own. A card is free when the two cards covering it are gone</li>
+          <li>The stock can be turned over as often as you like. Every deal is checked to be winnable</li>
+        </ul>
+        <h4 style={{ fontWeight: 600 }}>Controls</h4>
+        <ul><li>Tap a King to remove it, or tap two cards that make 13</li><li>Tap the stock pile to turn over a card</li></ul>
+      </div>
+    ) : variant === "freecell" ? (
       <div>
         <h3 style={{ fontWeight: 700 }}>FreeCell, deal #{dealNumber}</h3>
         <h4 style={{ fontWeight: 600 }}>Rules</h4>
@@ -178,13 +223,13 @@ export default function App() {
               </button>
             );
           })}
-          {variant === "freecell" && (
+          {numbered && (
             <form
               className="flex items-center gap-2"
               onSubmit={(e) => {
                 e.preventDefault();
                 const n = Math.round(Number(dealInput));
-                if (Number.isInteger(n) && n >= 1 && n <= MAX_DEAL) start("freecell", n);
+                if (Number.isInteger(n) && n >= 1 && n <= MAX_DEAL) start(variant, n);
                 setDealInput("");
               }}
             >
@@ -211,7 +256,7 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => start("freecell")}
+                onClick={() => start(variant)}
                 className="rounded-lg px-3 py-2 min-h-[2.75rem] text-xs font-bold"
                 style={{ background: "var(--line)", color: "var(--ink)" }}
               >
@@ -221,7 +266,25 @@ export default function App() {
           )}
         </div>
         <div ref={boardRef} className="relative w-full flex-1 min-h-0">
-          {variant === "freecell" ? (
+          {variant === "tripeaks" ? (
+            <TriPeaks
+              key={gameKey}
+              ref={gameRef}
+              dealNumber={dealNumber}
+              onScore={handleScore}
+              onGameOver={handleGameOver}
+              onMeta={setMeta}
+            />
+          ) : variant === "pyramid" ? (
+            <Pyramid
+              key={gameKey}
+              ref={gameRef}
+              dealNumber={dealNumber}
+              onScore={handleScore}
+              onGameOver={handleGameOver}
+              onMeta={setMeta}
+            />
+          ) : variant === "freecell" ? (
             <FreeCell
               key={gameKey}
               ref={gameRef}
