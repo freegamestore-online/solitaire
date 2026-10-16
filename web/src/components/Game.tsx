@@ -12,7 +12,7 @@ import {
 } from "../lib/cards";
 import { liftCard, dropCard, snapCard, cascadeDelay } from "../motion/card";
 import { seededRandom } from "../lib/random";
-import { drawKlondikeStock } from "../lib/klondike";
+import { canPlaceKlondikeFoundation, drawKlondikeStock } from "../lib/klondike";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -88,11 +88,7 @@ function canPlaceOnTableau(card: Card, column: Card[]): boolean {
   );
 }
 
-function canPlaceOnFoundation(card: Card, pile: Card[]): boolean {
-  if (pile.length === 0) return card.value === "A";
-  const top = pile[pile.length - 1]!;
-  return card.suit === top.suit && valueIndex(card.value) === valueIndex(top.value) + 1;
-}
+const FOUNDATION_SUITS: Suit[] = ["hearts", "diamonds", "clubs", "spades"];
 
 function allFaceUp(state: GameState): boolean {
   for (const col of state.tableau) {
@@ -166,8 +162,9 @@ function computeMove(
 
   if (to.type === "foundation") {
     if (cards.length > 1) return null;
+    if (!Number.isInteger(to.pile) || to.pile < 0 || to.pile >= next.foundations.length) return null;
     const destPile = next.foundations[to.pile]!;
-    if (!canPlaceOnFoundation(movingCard, destPile)) return null;
+    if (!canPlaceKlondikeFoundation(movingCard, destPile, FOUNDATION_SUITS[to.pile]!)) return null;
     detachFromSource();
     destPile.push({ ...movingCard, faceUp: true });
     return { next, sound: "score" };
@@ -411,7 +408,7 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
       if (next.waste.length > 0) {
         const card = next.waste[next.waste.length - 1]!;
         for (let f = 0; f < 4; f++) {
-          if (canPlaceOnFoundation(card, next.foundations[f]!)) {
+          if (canPlaceKlondikeFoundation(card, next.foundations[f]!, FOUNDATION_SUITS[f]!)) {
             next.foundations[f]!.push({ ...card, faceUp: true });
             next.waste.pop();
             movedCard = card;
@@ -425,7 +422,7 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
           if (col.length === 0) continue;
           const card = col[col.length - 1]!;
           for (let f = 0; f < 4; f++) {
-            if (canPlaceOnFoundation(card, next.foundations[f]!)) {
+            if (canPlaceKlondikeFoundation(card, next.foundations[f]!, FOUNDATION_SUITS[f]!)) {
               next.foundations[f]!.push({ ...card, faceUp: true });
               col.pop();
               movedCard = card;
@@ -548,7 +545,7 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
       if (!card || !isSingleCard) return false;
 
       for (let f = 0; f < 4; f++) {
-        if (canPlaceOnFoundation(card, state.foundations[f]!)) {
+        if (canPlaceKlondikeFoundation(card, state.foundations[f]!, FOUNDATION_SUITS[f]!)) {
           tryMove(from, { type: "foundation", pile: f });
           return true;
         }
@@ -637,7 +634,6 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
     onMeta?.({ moves, time: formatTime(elapsed), canUndo: history.length > 0 });
   }, [moves, elapsed, history.length, onMeta]);
 
-  const FOUNDATION_SUITS: Suit[] = ["hearts", "diamonds", "clubs", "spades"];
   const GAP = 8;
   const TABLEAU_OFFSET = 24;
   const TABLEAU_FACEDOWN_OFFSET = 8;

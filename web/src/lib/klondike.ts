@@ -1,4 +1,12 @@
-import type { Card } from "./cards";
+import { valueIndex, type Card, type Suit } from "./cards";
+
+/** Whether a card can be placed on the foundation assigned to `suit`. */
+export function canPlaceKlondikeFoundation(card: Card, pile: Card[], suit: Suit): boolean {
+  if (card.suit !== suit) return false;
+  if (pile.length === 0) return card.value === "A";
+  const top = pile[pile.length - 1]!;
+  return top.suit === suit && valueIndex(card.value) === valueIndex(top.value) + 1;
+}
 
 export interface KlondikePiles {
   stock: Card[];

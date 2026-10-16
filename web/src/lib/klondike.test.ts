@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { drawKlondikeStock } from "./klondike";
-import type { Card } from "./cards";
+import { canPlaceKlondikeFoundation, drawKlondikeStock } from "./klondike";
+import type { Card, Suit } from "./cards";
 
-const card = (value: Card["value"]): Card => ({ value, suit: "spades", faceUp: true });
+const card = (value: Card["value"], suit: Suit = "spades"): Card => ({ value, suit, faceUp: true });
+
+describe("Klondike foundations", () => {
+  it("accepts only the suit assigned to an empty foundation", () => {
+    expect(canPlaceKlondikeFoundation(card("A", "spades"), [], "spades")).toBe(true);
+    expect(canPlaceKlondikeFoundation(card("A", "spades"), [], "hearts")).toBe(false);
+  });
+
+  it("builds the assigned suit upward by one rank", () => {
+    expect(canPlaceKlondikeFoundation(card("2", "hearts"), [card("A", "hearts")], "hearts")).toBe(true);
+    expect(canPlaceKlondikeFoundation(card("2", "spades"), [card("A", "hearts")], "hearts")).toBe(false);
+  });
+});
 
 describe("Klondike stock", () => {
   it("recycles the waste so its former top card is drawn first", () => {
