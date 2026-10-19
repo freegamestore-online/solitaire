@@ -155,11 +155,12 @@ export const Spider = forwardRef<GameHandle, Props>(function Spider({ suits, onS
           {state.stock.length > 0 ? (
             <CardView
               card={{ ...state.stock[state.stock.length - 1]!, faceUp: false }}
+              testId="stock-pile"
               style={{ left: cardX(0), top: TOP_ROW_Y }}
               onClick={handleDeal}
             />
           ) : (
-            <EmptySlot style={{ position: "absolute", left: cardX(0), top: TOP_ROW_Y }} />
+            <EmptySlot testId="stock-pile" style={{ position: "absolute", left: cardX(0), top: TOP_ROW_Y }} />
           )}
           <span
             className="text-xs font-bold"

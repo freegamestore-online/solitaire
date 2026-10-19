@@ -138,11 +138,11 @@ export const Pyramid = forwardRef<GameHandle, Props>(function Pyramid({ dealNumb
         })}
 
         {state.stock.length > 0 ? (
-          <CardView card={{ ...state.stock[0]!, faceUp: false }} style={{ left: 0, top: STOCK_Y }} onClick={handleDraw} />
+          <CardView testId="stock-pile" card={{ ...state.stock[0]!, faceUp: false }} style={{ left: 0, top: STOCK_Y }} onClick={handleDraw} />
         ) : state.waste.length > 0 ? (
-          <EmptySlot style={{ position: "absolute", left: 0, top: STOCK_Y }} label="&#x21bb;" onClick={handleDraw} />
+          <EmptySlot testId="stock-pile" style={{ position: "absolute", left: 0, top: STOCK_Y }} label="&#x21bb;" onClick={handleDraw} />
         ) : (
-          <EmptySlot style={{ position: "absolute", left: 0, top: STOCK_Y }} />
+          <EmptySlot testId="stock-pile" style={{ position: "absolute", left: 0, top: STOCK_Y }} />
         )}
         {wasteTop ? (
           <CardView

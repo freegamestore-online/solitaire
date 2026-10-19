@@ -9,6 +9,7 @@
     "test": "pnpm --filter @solitaire/web test",
     "build": "pnpm --filter @solitaire/web build",
     "preview": "pnpm --filter @solitaire/web preview",
-    "typecheck": "pnpm --filter @solitaire/web exec tsc -b"
+    "typecheck": "pnpm --filter @solitaire/web exec tsc -b",
+    "test:e2e": "pnpm --filter @solitaire/web test:e2e"
   }
 }

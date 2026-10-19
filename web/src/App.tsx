@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { GameShell, GameTopbar, GameAuth } from "@freegamestore/games";
+import { GameShell, GameTopbar, GameAuth, Leaderboard } from "@freegamestore/games";
 import { Game, type GameHandle } from "./components/Game";
 import { Spider } from "./components/Spider";
 import { FreeCell } from "./components/FreeCell";
@@ -75,7 +75,8 @@ export default function App() {
   const boardRef = useRef<HTMLDivElement>(null);
   const particleRef = useRef<ParticleLayerHandle>(null);
   const [celebrationId, setCelebrationId] = useState<string | null>(null);
-  const { submitScore } = useLeaderboard("solitaire");
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const { topScores, recentScores, submitScore, loading: leaderboardLoading, refresh: refreshLeaderboard } = useLeaderboard("solitaire");
   // One daily board per mode, so times from different games are never compared.
   const dailyBoard = useLeaderboard(`solitaire-daily-${modeKey(variant)}`);
 
@@ -127,7 +128,8 @@ export default function App() {
   const start = useCallback((next: Variant, deal?: number, daily = false) => {
     setVariant(next);
     setIsDaily(daily);
-    setSeed(daily ? deal : undefined);
+    setSeed(daily || next === "klondike" || typeof next === "number" ? deal ?? randomDealNumber() : undefined);
+    setDealNumber(deal ?? randomDealNumber());
     if (next === "freecell") setDealNumber(deal ?? randomDealNumber());
     if (next === "tripeaks" || next === "pyramid") setDealNumber(solvableDeal(next, deal ?? randomDealNumber()));
     setScore(0);
@@ -140,7 +142,7 @@ export default function App() {
   }, []);
 
   const today = dateKey();
-  const numbered = variant === "freecell" || variant === "tripeaks" || variant === "pyramid";
+  const numbered = variant === "klondike" || typeof variant === "number" || variant === "freecell" || variant === "tripeaks" || variant === "pyramid";
 
   const rules =
     variant === "tripeaks" ? (
@@ -225,6 +227,18 @@ export default function App() {
                 }}
               >
                 Undo
+              </button>
+              <button
+                type="button"
+                aria-label="Leaderboard"
+                onClick={() => {
+                  refreshLeaderboard();
+                  setLeaderboardOpen(true);
+                }}
+                className="rounded-lg px-3 py-2 min-h-[2.75rem] text-xs font-bold"
+                style={{ background: "var(--line)", color: "var(--ink)" }}
+              >
+                Leaderboard
               </button>
               <GameAuth />
             </>
@@ -383,6 +397,26 @@ export default function App() {
             </div>
           )}
         </div>
+        {leaderboardOpen && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="leaderboard-title"
+            className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.55)" }}
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setLeaderboardOpen(false);
+            }}
+          >
+            <section className="w-full max-w-sm rounded-2xl shadow-xl" style={{ background: "var(--paper)", color: "var(--ink)" }}>
+              <header className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--line)" }}>
+                <h2 id="leaderboard-title" className="font-bold">Klondike leaderboard</h2>
+                <button type="button" aria-label="Close leaderboard" onClick={() => setLeaderboardOpen(false)} className="min-h-11 min-w-11 text-xl" style={{ color: "var(--muted)" }}>×</button>
+              </header>
+              <Leaderboard topScores={topScores} recentScores={recentScores} loading={leaderboardLoading} />
+            </section>
+          </div>
+        )}
       </div>
     </GameShell>
   );

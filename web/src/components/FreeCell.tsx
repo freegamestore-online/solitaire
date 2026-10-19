@@ -153,6 +153,7 @@ export const FreeCell = forwardRef<GameHandle, Props>(function FreeCell({ dealNu
             ) : (
               <EmptySlot
                 key={`cell-${cell}`}
+                testId={`free-cell-${cell}`}
                 style={{ position: "absolute", left: cardX(cell), top: TOP_ROW_Y }}
                 onClick={() => handleCellTap(cell)}
                 highlight={selected !== null}
@@ -196,6 +197,7 @@ export const FreeCell = forwardRef<GameHandle, Props>(function FreeCell({ dealNu
               <CardView
                 key={`${card.value}-${card.suit}`}
                 card={card}
+                testId={col === 0 && index === column.length - 1 ? "freecell-source" : undefined}
                 style={{ left: cardX(col), top: TABLEAU_Y + index * CASCADE_OFFSET, zIndex: index + 10 }}
                 selected={inSelection(col, index)}
                 onClick={() => handleCascadeTap(col, index)}

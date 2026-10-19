@@ -207,11 +207,17 @@ export function CardView({
   style,
   selected,
   onClick,
+  testId,
+  onDragStart,
+  onDrop,
 }: {
   card: Card;
   style?: React.CSSProperties;
   selected?: boolean;
   onClick?: () => void;
+  testId?: string;
+  onDragStart?: () => void;
+  onDrop?: () => void;
 }) {
   const color = isRed(card.suit) ? "#dc2626" : "var(--ink)";
   const symbol = SUIT_SYMBOLS[card.suit];
@@ -220,7 +226,12 @@ export function CardView({
     return (
       <div
         data-card={cardId(card)}
+        data-testid={testId}
         onClick={onClick}
+        draggable={Boolean(onDragStart)}
+        onDragStart={onDragStart}
+        onDragOver={onDrop ? (event) => event.preventDefault() : undefined}
+        onDrop={onDrop ? (event) => { event.preventDefault(); onDrop(); } : undefined}
         style={{
           width: CARD_W,
           height: CARD_H,
@@ -253,7 +264,12 @@ export function CardView({
   return (
     <div
       data-card={cardId(card)}
+      data-testid={testId}
       onClick={onClick}
+      draggable={Boolean(onDragStart)}
+      onDragStart={onDragStart}
+      onDragOver={onDrop ? (event) => event.preventDefault() : undefined}
+      onDrop={onDrop ? (event) => { event.preventDefault(); onDrop(); } : undefined}
       style={{
         width: CARD_W,
         height: CARD_H,
@@ -315,15 +331,22 @@ export function EmptySlot({
   style,
   onClick,
   highlight,
+  testId,
+  onDrop,
 }: {
   label?: string;
   style?: React.CSSProperties;
   onClick?: () => void;
   highlight?: boolean;
+  testId?: string;
+  onDrop?: () => void;
 }) {
   return (
     <div
+      data-testid={testId}
       onClick={onClick}
+      onDragOver={onDrop ? (event) => event.preventDefault() : undefined}
+      onDrop={onDrop ? (event) => { event.preventDefault(); onDrop(); } : undefined}
       style={{
         width: CARD_W,
         height: CARD_H,
@@ -363,6 +386,7 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
   const [elapsed, setElapsed] = useState(0);
   const [history, setHistory] = useState<MoveHistoryEntry[]>([]);
   const [selected, setSelected] = useState<Location | null>(null);
+  const [dragSource, setDragSource] = useState<Location | null>(null);
   const [autoCompleting, setAutoCompleting] = useState(false);
   const [landedIds, setLandedIds] = useState<string[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -608,6 +632,12 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
     [selected, tryMove, autoCompleting],
   );
 
+  const dropDragged = (to: Location) => {
+    if (dragSource) tryMove(dragSource, to);
+    setDragSource(null);
+    setSelected(null);
+  };
+
   const handleFoundationClick = useCallback(
     (pile: number) => {
       if (autoCompleting) return;
@@ -695,12 +725,14 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
           {state.stock.length > 0 ? (
             <CardView
               card={{ ...state.stock[state.stock.length - 1]!, faceUp: false }}
+              testId="stock-pile"
               style={{ left: 0, top: TOP_ROW_Y }}
               onClick={drawFromStock}
             />
           ) : (
             <EmptySlot
               style={{ position: "absolute", left: 0, top: TOP_ROW_Y }}
+              testId="stock-pile"
               onClick={drawFromStock}
               label="&#x21bb;"
             />
@@ -724,6 +756,7 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
                     }}
                     selected={isTop && isSelected(loc)}
                     onClick={isTop ? () => handleCardClick(loc) : undefined}
+                    onDragStart={isTop ? () => { setDragSource(loc); setSelected(loc); } : undefined}
                   />
                 );
               })}
@@ -750,6 +783,7 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
                   style={{ left: x, top: TOP_ROW_Y }}
                   selected={isSelected(loc)}
                   onClick={() => handleFoundationClick(i)}
+                  onDrop={() => dropDragged(loc)}
                 />
               );
             }
@@ -759,6 +793,7 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
                 label={SUIT_SYMBOLS[suit]}
                 style={{ position: "absolute", left: x, top: TOP_ROW_Y }}
                 onClick={() => handleFoundationClick(i)}
+                onDrop={() => dropDragged(loc)}
                 highlight={isHighlight}
               />
             );
@@ -774,6 +809,7 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
                   key={`tab-empty-${colIdx}`}
                   style={{ position: "absolute", left: x, top: TABLEAU_Y }}
                   onClick={() => handleEmptyTableauClick(colIdx)}
+                  onDrop={() => dropDragged({ type: "tableau", col: colIdx, cardIndex: 0 })}
                   highlight={isHighlight}
                 />
               );
@@ -809,6 +845,8 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
                         ? () => handleCardClick(loc)
                         : undefined
                   }
+                  onDragStart={clickable ? () => { setDragSource(loc); setSelected(loc); } : undefined}
+                  onDrop={() => dropDragged({ type: "tableau", col: colIdx, cardIndex: idx })}
                 />
               );
             });

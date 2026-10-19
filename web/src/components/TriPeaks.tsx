@@ -112,11 +112,12 @@ export const TriPeaks = forwardRef<GameHandle, Props>(function TriPeaks({ dealNu
         {state.drawn < state.stock.length ? (
           <CardView
             card={{ ...state.stock[state.drawn]!, faceUp: false }}
+            testId="stock-pile"
             style={{ left: 0, top: STOCK_Y }}
             onClick={handleDraw}
           />
         ) : (
-          <EmptySlot style={{ position: "absolute", left: 0, top: STOCK_Y }} onClick={undefined} />
+          <EmptySlot testId="stock-pile" style={{ position: "absolute", left: 0, top: STOCK_Y }} onClick={undefined} />
         )}
         <CardView card={state.waste} style={{ left: CARD_W + 16, top: STOCK_Y, zIndex: 50 }} />
         <span className="text-xs font-bold" style={{ position: "absolute", left: 2 * (CARD_W + 16), top: STOCK_Y + 36, color: "var(--success)" }}>
