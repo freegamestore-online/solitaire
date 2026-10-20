@@ -20,6 +20,7 @@ import {
   type StatsFile,
 } from "./lib/stats";
 import { useLeaderboard } from '@freegamestore/games';
+import { loadDrawMode, saveDrawMode, type DrawMode } from "./lib/drawMode";
 import { Celebration, ParticleLayer, type ParticleLayerHandle } from "./feel";
 import type { GamePhase, Variant } from "./types";
 
@@ -39,7 +40,7 @@ const MODES: { value: Variant; label: string }[] = [
 ];
 
 /** The key a mode goes by in stats, and in the daily deal and leaderboard names. */
-const modeKey = (variant: Variant): string => String(variant);
+const modeKey = (variant: Variant, drawMode: DrawMode = 1): string => variant === "klondike" ? `klondike-${drawMode}` : String(variant);
 
 /** The first deal at or after `from` that the solver can win. Falls back to `from` if none of the next few is solvable. */
 function solvableDeal(variant: "tripeaks" | "pyramid", from: number): number {
@@ -53,20 +54,16 @@ function solvableDeal(variant: "tripeaks" | "pyramid", from: number): number {
 /** Format seconds as m:ss, for stats. */
 const formatSeconds = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
-/** Loads the stats once, migrating any old best score. Only the stats file is written after this. */
-function loadStats(): StatsFile {
-  return loadInitialStats(localStorage.getItem(STATS_KEY), localStorage.getItem(LEGACY_BEST_KEY));
-}
-
 export default function App() {
   const [phase, setPhase] = useState<GamePhase>("playing");
   const [variant, setVariant] = useState<Variant>("klondike");
+  const [drawMode, setDrawMode] = useState<DrawMode>(() => loadDrawMode(localStorage));
   const [dealNumber, setDealNumber] = useState(() => randomDealNumber());
   const [seed, setSeed] = useState<number | undefined>(undefined);
   const [isDaily, setIsDaily] = useState(false);
   const [dealInput, setDealInput] = useState("");
   const [score, setScore] = useState(0);
-  const [stats, setStats] = useState<StatsFile>(loadStats);
+  const [stats, setStats] = useState<StatsFile>(() => loadInitialStats(localStorage.getItem(STATS_KEY), localStorage.getItem(LEGACY_BEST_KEY), modeKey("klondike", drawMode)));
   const [gameKey, setGameKey] = useState(0);
   const [meta, setMeta] = useState({ moves: 0, time: "0:00", canUndo: false });
   const scoreRef = useRef(0);
@@ -76,15 +73,18 @@ export default function App() {
   const particleRef = useRef<ParticleLayerHandle>(null);
   const [celebrationId, setCelebrationId] = useState<string | null>(null);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
-  const { topScores, recentScores, submitScore, loading: leaderboardLoading, refresh: refreshLeaderboard } = useLeaderboard("solitaire");
+  const leaderboardKey = `solitaire-${modeKey(variant, drawMode)}`;
+  const { topScores, recentScores, submitScore, loading: leaderboardLoading, refresh: refreshLeaderboard } = useLeaderboard(leaderboardKey);
   // One daily board per mode, so times from different games are never compared.
-  const dailyBoard = useLeaderboard(`solitaire-daily-${modeKey(variant)}`);
+  const dailyBoard = useLeaderboard(`solitaire-daily-${modeKey(variant, drawMode)}`);
+
+  useEffect(() => saveDrawMode(localStorage, drawMode), [drawMode]);
 
   useEffect(() => {
     localStorage.setItem(STATS_KEY, JSON.stringify(stats));
   }, [stats]);
 
-  const bestScore = modeOf(stats, modeKey(variant)).bestScore;
+  const bestScore = modeOf(stats, modeKey(variant, drawMode)).bestScore;
 
   const handleScore = useCallback((s: number) => {
     scoreRef.current = s;
@@ -94,7 +94,7 @@ export default function App() {
   const handleGameOver = useCallback(() => {
     const final = scoreRef.current;
     const seconds = Math.max(1, Math.round((Date.now() - startedAt.current) / 1000));
-    setStats((s) => recordWin(s, modeKey(variant), final, seconds));
+    setStats((s) => recordWin(s, modeKey(variant, drawMode), final, seconds));
     if (isDaily) {
       // A daily time is a score on the mode's daily board. The platform may refuse it, and that is not shown.
       dailyBoard.submitScore(DAILY_SCORE_BASE - seconds).then(
@@ -117,7 +117,7 @@ export default function App() {
       });
     }
     setCelebrationId(`win-${Date.now()}`);
-  }, [submitScore, dailyBoard.submitScore, variant, isDaily]);
+  }, [submitScore, dailyBoard.submitScore, variant, drawMode, isDaily]);
 
   const endCelebration = useCallback(() => setCelebrationId(null), []);
 
@@ -125,7 +125,7 @@ export default function App() {
    * Start a new game in the given mode. `deal` is the deal number to play, or a random one.
    * A daily game passes today's number and sets `daily`.
    */
-  const start = useCallback((next: Variant, deal?: number, daily = false) => {
+  const start = useCallback((next: Variant, deal?: number, daily = false, selectedDrawMode: DrawMode = drawMode) => {
     setVariant(next);
     setIsDaily(daily);
     setSeed(daily || next === "klondike" || typeof next === "number" ? deal ?? randomDealNumber() : undefined);
@@ -136,10 +136,10 @@ export default function App() {
     scoreRef.current = 0;
     setCelebrationId(null);
     startedAt.current = Date.now();
-    setStats((s) => recordStart(s, modeKey(next)));
+    setStats((s) => recordStart(s, modeKey(next, selectedDrawMode)));
     setGameKey((k) => k + 1);
     setPhase("playing");
-  }, []);
+  }, [drawMode]);
 
   const today = dateKey();
   const numbered = variant === "klondike" || typeof variant === "number" || variant === "freecell" || variant === "tripeaks" || variant === "pyramid";
@@ -187,7 +187,7 @@ export default function App() {
         <h4 style={{ fontWeight: 600 }}>Rules</h4>
         <ul><li>Build foundation piles from Ace to King by suit</li><li>Tableau builds down in alternating colors</li></ul>
         <h4 style={{ fontWeight: 600 }}>Controls</h4>
-        <ul><li>Tap to select a card, tap to place it</li><li>Draw one card from the stock at a time</li></ul>
+        <ul><li>Tap to select a card, tap to place it</li><li>Draw 1 turns over one stock card; Draw 3 turns over up to three. Draw 3 allows one free recycle, then costs 100 points per recycle</li></ul>
       </div>
     ) : (
       <div>
@@ -249,6 +249,14 @@ export default function App() {
     >
       <div className="flex flex-col w-full h-full">
         <div className="mode-bar flex flex-wrap justify-center gap-2 px-2 pt-2" role="group" aria-label="Game mode">
+          {variant === "klondike" && ([1, 3] as const).map((count) => (
+            <button key={count} type="button" aria-pressed={drawMode === count} aria-label={`Draw ${count}`}
+              onClick={() => { if (drawMode !== count) { setDrawMode(count); start("klondike", undefined, false, count); } }}
+              className="rounded-lg px-3 py-2 min-h-[2.75rem] text-xs font-bold"
+              style={{ background: drawMode === count ? "var(--accent)" : "var(--line)", color: drawMode === count ? "#fff" : "var(--muted)" }}>
+              Draw {count}
+            </button>
+          ))}
           {MODES.map((mode) => {
             const active = variant === mode.value;
             return (
@@ -319,7 +327,7 @@ export default function App() {
         <div className="stats-line px-2 pt-1 text-xs font-bold" style={{ color: "var(--muted)" }}>
           {isDaily && <span style={{ color: "var(--accent)" }}>Daily deal, {today} (UTC) · </span>}
           {(() => {
-            const m = modeOf(stats, modeKey(variant));
+            const m = modeOf(stats, modeKey(variant, drawMode));
             return (
               <span>
                 Played {m.played} · Won {m.won} · Best {m.bestScore}
@@ -360,7 +368,7 @@ export default function App() {
             <Game
               key={gameKey}
               ref={gameRef}
-              drawCount={1}
+              drawCount={drawMode}
               seed={seed}
               onScore={handleScore}
               onGameOver={handleGameOver}
@@ -410,7 +418,7 @@ export default function App() {
           >
             <section className="w-full max-w-sm rounded-2xl shadow-xl" style={{ background: "var(--paper)", color: "var(--ink)" }}>
               <header className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--line)" }}>
-                <h2 id="leaderboard-title" className="font-bold">Klondike leaderboard</h2>
+                <h2 id="leaderboard-title" className="font-bold">Klondike Draw {drawMode} leaderboard</h2>
                 <button type="button" aria-label="Close leaderboard" onClick={() => setLeaderboardOpen(false)} className="min-h-11 min-w-11 text-xl" style={{ color: "var(--muted)" }}>×</button>
               </header>
               <Leaderboard topScores={topScores} recentScores={recentScores} loading={leaderboardLoading} />

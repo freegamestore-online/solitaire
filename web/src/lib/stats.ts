@@ -50,6 +50,8 @@ export function migrateStats(raw: string | null, legacyBest: string | null): Sta
         for (const [name, mode] of Object.entries(parsed.modes as Record<string, unknown>)) {
           modes[name] = sanitizeMode(mode);
         }
+        if (modes.klondike && !modes["klondike-1"]) modes["klondike-1"] = modes.klondike;
+        delete modes.klondike;
         return { version: STATS_VERSION, modes };
       }
     } catch {
@@ -58,7 +60,7 @@ export function migrateStats(raw: string | null, legacyBest: string | null): Sta
   }
   const best = legacyBest !== null && /^\d+$/.test(legacyBest) ? nonNegative(Number(legacyBest)) : 0;
   const modes: Record<string, ModeStats> = {};
-  if (best > 0) modes.klondike = { ...emptyMode(), bestScore: best };
+  if (best > 0) modes["klondike-1"] = { ...emptyMode(), bestScore: best };
   return { version: STATS_VERSION, modes };
 }
 
@@ -72,8 +74,8 @@ export function recordStart(file: StatsFile, mode: string): StatsFile {
 }
 
 /** Load saved stats and count the Klondike game shown on the first page load. */
-export function loadInitialStats(raw: string | null, legacyBest: string | null): StatsFile {
-  return recordStart(migrateStats(raw, legacyBest), "klondike");
+export function loadInitialStats(raw: string | null, legacyBest: string | null, mode = "klondike-1"): StatsFile {
+  return recordStart(migrateStats(raw, legacyBest), mode);
 }
 
 export function recordWin(file: StatsFile, mode: string, score: number, seconds: number): StatsFile {

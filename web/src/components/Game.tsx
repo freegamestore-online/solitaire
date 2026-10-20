@@ -12,7 +12,7 @@ import {
 } from "../lib/cards";
 import { liftCard, dropCard, snapCard, cascadeDelay } from "../motion/card";
 import { seededRandom } from "../lib/random";
-import { canPlaceKlondikeFoundation, drawKlondikeStock } from "../lib/klondike";
+import { canPlaceKlondikeFoundation, drawKlondikeStock, klondikeRecyclePenalty } from "../lib/klondike";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -23,6 +23,7 @@ interface GameState {
   foundations: Card[][]; // 4 piles (one per suit order: hearts, diamonds, clubs, spades)
   stock: Card[];
   waste: Card[];
+  recycles: number;
 }
 
 interface MoveHistoryEntry {
@@ -59,6 +60,7 @@ function cloneState(s: GameState): GameState {
     foundations: s.foundations.map((p) => p.map((c) => ({ ...c }))),
     stock: s.stock.map((c) => ({ ...c })),
     waste: s.waste.map((c) => ({ ...c })),
+    recycles: s.recycles,
   };
 }
 
@@ -76,7 +78,7 @@ function initGame(seed?: number): GameState {
     tableau.push(pile);
   }
   const stock = deck.slice(idx).map((c) => ({ ...c, faceUp: false }));
-  return { tableau, foundations: [[], [], [], []], stock, waste: [] };
+  return { tableau, foundations: [[], [], [], []], stock, waste: [], recycles: 0 };
 }
 
 function canPlaceOnTableau(card: Card, column: Card[]): boolean {
@@ -405,9 +407,10 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
 
   // Report score continuously
   useEffect(() => {
-    const score = Math.max(0, 10000 - moves * 10 - elapsed);
+    const recyclePenalty = klondikeRecyclePenalty(drawCount, state.recycles);
+    const score = Math.max(0, 10000 - moves * 10 - elapsed - recyclePenalty);
     onScore(score);
-  }, [moves, elapsed, onScore]);
+  }, [moves, elapsed, onScore, drawCount, state.recycles]);
 
   // Win detection
   useEffect(() => {
@@ -512,7 +515,8 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
     const piles = drawKlondikeStock(state.stock, state.waste, drawCount);
     if (!piles) return;
     pushHistory(state);
-    setState({ ...state, stock: piles.stock, waste: piles.waste });
+    const recycling = state.stock.length === 0 && state.waste.length > 0;
+    setState({ ...state, stock: piles.stock, waste: piles.waste, recycles: state.recycles + (recycling ? 1 : 0) });
     setMoves((m) => m + 1);
   }, [drawCount, pushHistory, state]);
 
@@ -749,6 +753,7 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
                   <CardView
                     key={cardId(card)}
                     card={card}
+                    testId="waste-card"
                     style={{
                       left: CARD_W + GAP + i * 18,
                       top: TOP_ROW_Y,

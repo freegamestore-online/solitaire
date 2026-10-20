@@ -13,6 +13,11 @@ export interface KlondikePiles {
   waste: Card[];
 }
 
+/** Draw 3 permits one free recycle; each later stock recycle costs 100 points. */
+export function klondikeRecyclePenalty(drawCount: number, recycleCount: number): number {
+  return drawCount === 3 ? Math.max(0, recycleCount - 1) * 100 : 0;
+}
+
 /** Draw from the stock, recycle the waste with its current top first, or return null when both are empty. */
 export function drawKlondikeStock(stock: Card[], waste: Card[], drawCount: number): KlondikePiles | null {
   if (stock.length === 0) {
