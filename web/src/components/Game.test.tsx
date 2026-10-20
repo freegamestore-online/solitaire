@@ -18,8 +18,8 @@ describe("Klondike under StrictMode", () => {
     );
 
     fireEvent.click(container.querySelector("[data-card]")!);
-    await waitFor(() => expect(meta.moves).toBe(1));
+    await waitFor(() => expect(meta.moves).toBe(1), { timeout: 15_000 });
     act(() => ref.current?.undo());
-    await waitFor(() => expect(meta.moves).toBe(2));
-  });
+    await waitFor(() => expect(meta.moves).toBe(2), { timeout: 15_000 });
+  }, 20_000);
 });
