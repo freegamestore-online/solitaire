@@ -13,6 +13,7 @@ import {
   type Source,
   type Target,
 } from "../lib/freecell";
+import { formatDuration } from "../lib/time";
 
 interface Props {
   /** The numbered deal to play. Changing it starts a new game (App remounts this component). */
@@ -28,7 +29,6 @@ const TOP_ROW_Y = 8;
 const TABLEAU_Y = CARD_H + TOP_ROW_Y + 16;
 const CASCADE_OFFSET = 24;
 
-const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 const cardX = (col: number) => col * (CARD_W + GAP);
 
 /**
@@ -65,7 +65,7 @@ export const FreeCell = forwardRef<GameHandle, Props>(function FreeCell({ dealNu
   }, [state, onGameOver]);
 
   useEffect(() => {
-    onMeta?.({ moves, time: formatTime(elapsed), canUndo: history.length > 0 });
+    onMeta?.({ moves, time: formatDuration(elapsed), canUndo: history.length > 0 });
   }, [moves, elapsed, history.length, onMeta]);
 
   const undo = () => {

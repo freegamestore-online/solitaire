@@ -10,6 +10,7 @@ import {
   dealTriPeaks,
   type TriPeaksState,
 } from "../lib/tripeaks";
+import { formatDuration } from "../lib/time";
 
 interface Props {
   /** The solvable deal to play. App picks it, so the same number always gives the same deal. */
@@ -23,8 +24,6 @@ interface Props {
 const STEP_X = CARD_W / 2;
 const ROW_Y = [0, 70, 140, 210];
 const STOCK_Y = 330;
-
-const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
 /**
  * TriPeaks. Tap a peak card that is free and whose rank is a neighbour of the waste
@@ -60,7 +59,7 @@ export const TriPeaks = forwardRef<GameHandle, Props>(function TriPeaks({ dealNu
   }, [state, onGameOver]);
 
   useEffect(() => {
-    onMeta?.({ moves, time: formatTime(elapsed), canUndo: history.length > 0 });
+    onMeta?.({ moves, time: formatDuration(elapsed), canUndo: history.length > 0 });
   }, [moves, elapsed, history.length, onMeta]);
 
   const apply = (next: TriPeaksState, play: boolean) => {

@@ -13,6 +13,7 @@ import {
 import { liftCard, dropCard, snapCard, cascadeDelay } from "../motion/card";
 import { seededRandom } from "../lib/random";
 import { canPlaceKlondikeFoundation, drawKlondikeStock, klondikeRecyclePenalty } from "../lib/klondike";
+import { formatDuration } from "../lib/time";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -657,15 +658,9 @@ export const Game = forwardRef<GameHandle, Props>(function Game(
   );
 
   /* ---- Rendering ---- */
-  const formatTime = (s: number) => {
-    const min = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${min}:${sec.toString().padStart(2, "0")}`;
-  };
-
   // Surface moves / time / undo-availability to the topbar.
   useEffect(() => {
-    onMeta?.({ moves, time: formatTime(elapsed), canUndo: history.length > 0 });
+    onMeta?.({ moves, time: formatDuration(elapsed), canUndo: history.length > 0 });
   }, [moves, elapsed, history.length, onMeta]);
 
   const GAP = 8;

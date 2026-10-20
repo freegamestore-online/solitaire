@@ -9,6 +9,7 @@ import {
   type PyramidSource,
   type PyramidState,
 } from "../lib/pyramid";
+import { formatDuration } from "../lib/time";
 
 interface Props {
   /** The solvable deal to play. App picks it, so the same number always gives the same deal. */
@@ -23,8 +24,6 @@ const STEP_X = CARD_W + GAP;
 const ROW_STEP = 50;
 const BOARD_W = 6 * STEP_X + CARD_W;
 const STOCK_Y = 7 * ROW_STEP + 24;
-
-const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
 /** Left edge of pyramid card `i`: each row is centred, so the apex sits over the middle. */
 function pyramidXY(i: number): { x: number; y: number } {
@@ -72,7 +71,7 @@ export const Pyramid = forwardRef<GameHandle, Props>(function Pyramid({ dealNumb
   }, [state, onGameOver]);
 
   useEffect(() => {
-    onMeta?.({ moves, time: formatTime(elapsed), canUndo: history.length > 0 });
+    onMeta?.({ moves, time: formatDuration(elapsed), canUndo: history.length > 0 });
   }, [moves, elapsed, history.length, onMeta]);
 
   const apply = (next: PyramidState) => {

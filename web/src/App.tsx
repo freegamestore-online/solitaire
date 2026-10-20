@@ -21,6 +21,7 @@ import {
 } from "./lib/stats";
 import { useLeaderboard } from '@freegamestore/games';
 import { loadDrawMode, saveDrawMode, type DrawMode } from "./lib/drawMode";
+import { formatDuration } from "./lib/time";
 import { Celebration, ParticleLayer, type ParticleLayerHandle } from "./feel";
 import type { GamePhase, Variant } from "./types";
 
@@ -52,7 +53,6 @@ function solvableDeal(variant: "tripeaks" | "pyramid", from: number): number {
 }
 
 /** Format seconds as m:ss, for stats. */
-const formatSeconds = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
 export default function App() {
   const [phase, setPhase] = useState<GamePhase>("playing");
@@ -331,7 +331,7 @@ export default function App() {
             return (
               <span>
                 Played {m.played} · Won {m.won} · Best {m.bestScore}
-                {m.bestSeconds !== null && ` · Fastest ${formatSeconds(m.bestSeconds)}`}
+                {m.bestSeconds !== null && ` · Fastest ${formatDuration(m.bestSeconds)}`}
               </span>
             );
           })()}

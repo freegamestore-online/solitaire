@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "re
 import { useGameSounds } from "@freegamestore/games";
 import { CARD_H, CARD_W, CardView, EmptySlot, type GameHandle } from "./Game";
 import { seededRandom } from "../lib/random";
+import { formatDuration } from "../lib/time";
 import {
   COLUMNS,
   RUNS_TO_WIN,
@@ -35,8 +36,6 @@ const TOP_ROW_Y = 8;
 const TABLEAU_Y = CARD_H + TOP_ROW_Y + 16;
 const FACE_DOWN_OFFSET = 8;
 const FACE_UP_OFFSET = 24;
-
-const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
 /**
  * Spider solitaire. Tap a face-up run to pick it up, then tap a column to drop it. Deal
@@ -76,7 +75,7 @@ export const Spider = forwardRef<GameHandle, Props>(function Spider({ suits, onS
 
   // Surface moves / time / undo-availability to the topbar.
   useEffect(() => {
-    onMeta?.({ moves, time: formatTime(elapsed), canUndo: history.length > 0 });
+    onMeta?.({ moves, time: formatDuration(elapsed), canUndo: history.length > 0 });
   }, [moves, elapsed, history.length, onMeta]);
 
   const apply = (next: SpiderState) => {
