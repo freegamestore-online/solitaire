@@ -1,5 +1,5 @@
 import { StrictMode, createRef } from "react";
-import { fireEvent, render, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Game, type GameHandle } from "./Game";
 
@@ -19,7 +19,7 @@ describe("Klondike under StrictMode", () => {
 
     fireEvent.click(container.querySelector("[data-card]")!);
     await waitFor(() => expect(meta.moves).toBe(1));
-    ref.current?.undo();
+    act(() => ref.current?.undo());
     await waitFor(() => expect(meta.moves).toBe(2));
   });
 });
