@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canPlaceKlondikeFoundation, drawKlondikeStock } from "./klondike";
+import { canPlaceKlondikeFoundation, drawKlondikeStock, klondikeRecyclePenalty } from "./klondike";
 import type { Card, Suit } from "./cards";
 
 const card = (value: Card["value"], suit: Suit = "spades"): Card => ({ value, suit, faceUp: true });
@@ -35,5 +35,22 @@ describe("Klondike stock", () => {
     const result = drawKlondikeStock([card("A"), card("2")], [], 3)!;
     expect(result.stock).toEqual([]);
     expect(result.waste.map((item) => item.value)).toEqual(["2", "A"]);
+  });
+
+  it("draws up to three cards in Draw 3, including a short final draw", () => {
+    const result = drawKlondikeStock([card("A"), card("2"), card("3"), card("4")], [], 3)!;
+    expect(result.stock).toHaveLength(1);
+    expect(result.waste.map((item) => item.value)).toEqual(["4", "3", "2"]);
+    const finalDraw = drawKlondikeStock(result.stock, result.waste, 3)!;
+    expect(finalDraw.stock).toHaveLength(0);
+    expect(finalDraw.waste.slice(-1).map((item) => item.value)).toEqual(["A"]);
+  });
+
+  it("charges 100 points from the second Draw 3 recycle onward", () => {
+    expect(klondikeRecyclePenalty(3, 0)).toBe(0);
+    expect(klondikeRecyclePenalty(3, 1)).toBe(0);
+    expect(klondikeRecyclePenalty(3, 2)).toBe(100);
+    expect(klondikeRecyclePenalty(3, 3)).toBe(200);
+    expect(klondikeRecyclePenalty(1, 3)).toBe(0);
   });
 });
