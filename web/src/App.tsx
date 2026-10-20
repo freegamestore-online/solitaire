@@ -10,6 +10,7 @@ import { dealTriPeaks, triPeaksPuzzle } from "./lib/tripeaks";
 import { dealPyramid, pyramidPuzzle } from "./lib/pyramid";
 import { findSolvableDeal } from "./lib/solver";
 import { dailyDealNumber, dateKey } from "./lib/daily";
+import { DAILY_STATS_KEY, loadDailyStats, recordDailyStart, recordDailyWin } from "./lib/dailyStats";
 import {
   LEGACY_BEST_KEY,
   STATS_KEY,
@@ -61,6 +62,8 @@ export default function App() {
   const [dealNumber, setDealNumber] = useState(() => randomDealNumber());
   const [seed, setSeed] = useState<number | undefined>(undefined);
   const [isDaily, setIsDaily] = useState(false);
+  const [dailyDate, setDailyDate] = useState<string | null>(null);
+  const [dailyStats, setDailyStats] = useState(() => loadDailyStats(localStorage.getItem(DAILY_STATS_KEY)));
   const [dealInput, setDealInput] = useState("");
   const [score, setScore] = useState(0);
   const [stats, setStats] = useState<StatsFile>(() => loadInitialStats(localStorage.getItem(STATS_KEY), localStorage.getItem(LEGACY_BEST_KEY), modeKey("klondike", drawMode)));
@@ -84,6 +87,10 @@ export default function App() {
     localStorage.setItem(STATS_KEY, JSON.stringify(stats));
   }, [stats]);
 
+  useEffect(() => {
+    localStorage.setItem(DAILY_STATS_KEY, JSON.stringify(dailyStats));
+  }, [dailyStats]);
+
   const bestScore = modeOf(stats, modeKey(variant, drawMode)).bestScore;
 
   const handleScore = useCallback((s: number) => {
@@ -96,6 +103,7 @@ export default function App() {
     const seconds = Math.max(1, Math.round((Date.now() - startedAt.current) / 1000));
     setStats((s) => recordWin(s, modeKey(variant, drawMode), final, seconds));
     if (isDaily) {
+      if (dailyDate) setDailyStats((s) => recordDailyWin(s, dailyDate, drawMode, meta.moves, seconds));
       // A daily time is a score on the mode's daily board. The platform may refuse it, and that is not shown.
       dailyBoard.submitScore(DAILY_SCORE_BASE - seconds).then(
         () => undefined,
@@ -117,7 +125,7 @@ export default function App() {
       });
     }
     setCelebrationId(`win-${Date.now()}`);
-  }, [submitScore, dailyBoard.submitScore, variant, drawMode, isDaily]);
+  }, [submitScore, dailyBoard.submitScore, variant, drawMode, isDaily, dailyDate, meta.moves]);
 
   const endCelebration = useCallback(() => setCelebrationId(null), []);
 
@@ -128,6 +136,9 @@ export default function App() {
   const start = useCallback((next: Variant, deal?: number, daily = false, selectedDrawMode: DrawMode = drawMode) => {
     setVariant(next);
     setIsDaily(daily);
+    const startedDailyDate = daily ? dateKey() : null;
+    setDailyDate(startedDailyDate);
+    if (daily && next === "klondike") setDailyStats((s) => recordDailyStart(s, startedDailyDate!, selectedDrawMode));
     setSeed(daily || next === "klondike" || typeof next === "number" ? deal ?? randomDealNumber() : undefined);
     setDealNumber(deal ?? randomDealNumber());
     if (next === "freecell") setDealNumber(deal ?? randomDealNumber());
@@ -274,14 +285,14 @@ export default function App() {
               </button>
             );
           })}
-          <button
+          {variant === "klondike" && <button
             type="button"
-            onClick={() => start(variant, dailyDealNumber(modeKey(variant), today), true)}
+            onClick={() => start("klondike", dailyDealNumber(modeKey("klondike", drawMode), today), true)}
             className="rounded-lg px-3 py-2 min-h-[2.75rem] text-xs font-bold"
             style={{ background: "var(--panel)", color: "var(--ink)", border: "1px solid var(--line-strong)" }}
           >
             Today&apos;s deal
-          </button>
+          </button>}
           {numbered && (
             <form
               className="flex items-center gap-2"
@@ -325,7 +336,8 @@ export default function App() {
           )}
         </div>
         <div className="stats-line px-2 pt-1 text-xs font-bold" style={{ color: "var(--muted)" }}>
-          {isDaily && <span style={{ color: "var(--accent)" }}>Daily deal, {today} (UTC) · </span>}
+          {isDaily && <span style={{ color: "var(--accent)" }}>Daily deal, {dailyDate} (UTC) · </span>}
+          {isDaily && dailyDate && <span data-testid="daily-result">{dailyStats.results[`${dailyDate}:draw-${drawMode}`]?.won ? `Completed · ${dailyStats.results[`${dailyDate}:draw-${drawMode}`]?.moves} moves · ${formatDuration(dailyStats.results[`${dailyDate}:draw-${drawMode}`]?.seconds ?? 0)} · ` : "Not yet completed · "}Streak {dailyStats.currentStreak} (best {dailyStats.bestStreak}) · </span>}
           {(() => {
             const m = modeOf(stats, modeKey(variant, drawMode));
             return (
