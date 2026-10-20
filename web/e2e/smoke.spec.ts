@@ -41,7 +41,7 @@ test("leaderboard opens and renders scores", async ({ page }) => {
   const consoleErrors = collectConsoleErrors(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Leaderboard" }).click();
-  const dialog = page.getByRole("dialog", { name: "Klondike leaderboard" });
+  const dialog = page.getByRole("dialog", { name: "Klondike Draw 1 leaderboard" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByText("Browser test")).toBeVisible();
   await page.getByRole("button", { name: "Close leaderboard" }).click();
