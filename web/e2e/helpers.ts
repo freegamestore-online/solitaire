@@ -11,13 +11,20 @@ export async function stubExternalServices(page: Page) {
     },
     json: null,
   }));
-  await page.route("https://freegamestore-leaderboard.serge-the-dev.workers.dev/**", async (route) => {
+  // The games SDK (>= 0.20) talks to leaderboard.freegamestore.online.
+  await page.route("https://leaderboard.freegamestore.online/**", async (route) => {
+    const cors = {
+      "access-control-allow-origin": "http://127.0.0.1:4187",
+      "access-control-allow-credentials": "true",
+      "access-control-allow-headers": "*",
+      "access-control-allow-methods": "GET, POST, OPTIONS",
+    };
     const method = route.request().method();
     const path = new URL(route.request().url()).pathname;
     if (method === "POST" || path.endsWith("/recent")) {
-      await route.fulfill({ json: { scores: [], ok: true } });
+      await route.fulfill({ headers: cors, json: { scores: [], ok: true } });
     } else {
-      await route.fulfill({ json: { scores: [{ player_name: "Browser test", score: 1234, created_at: "2026-01-01T00:00:00Z" }] } });
+      await route.fulfill({ headers: cors, json: { scores: [{ player_name: "Browser test", score: 1234, created_at: "2026-01-01T00:00:00Z" }] } });
     }
   });
   await page.route("https://fonts.googleapis.com/**", (route) => route.fulfill({ status: 200, contentType: "text/css", body: "" }));
